@@ -48,7 +48,7 @@ function claim(r,player,slot,deviceId=''){
   r.results.push(result); emit(r); return {ok:true,result,room:pub(r)};
 }
 
-app.get('/api/version',(req,res)=>res.json({ok:true,version:'1.1.0'}));
+app.get('/api/version',(req,res)=>res.json({ok:true,version:'1.1.1'}));
 app.post('/api/login',(req,res)=>res.json({ok:req.body.password===ADMIN_PASSWORD}));
 app.post('/api/rooms',(req,res)=>{
   let id=code();while(rooms.has(id))id=code();
