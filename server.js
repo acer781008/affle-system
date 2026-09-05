@@ -11,7 +11,7 @@ const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD || '8888';
 const rooms=new Map();
 const code=()=>Math.random().toString(36).slice(2,8).toUpperCase();
 const token=()=>crypto.randomBytes(18).toString('hex');
-function pub(r){return {id:r.id,title:r.title,mode:r.mode,count:r.count,note:r.note,limitOnePerPlayer:r.limitOnePerPlayer!==false,balloonShape:r.balloonShape,balloonFloat:r.balloonFloat,eggStyle:r.eggStyle,boardCols:[5,7,10].includes(+r.boardCols)?+r.boardCols:5,prizes:r.prizes.map(p=>({name:p.name,qty:p.qty,left:p.left,isLose:!!p.isLose})),results:r.results.map(x=>({slot:x.slot,prize:x.prize,isLose:!!x.isLose,player:x.player,time:x.time})),status:r.status};}
+function pub(r){return {id:r.id,title:r.title,mode:r.mode,count:r.count,note:r.note,limitOnePerPlayer:r.limitOnePerPlayer!==false,balloonShape:r.balloonShape,balloonFloat:r.balloonFloat,eggStyle:r.eggStyle,boardCols:[5,7,8].includes(+r.boardCols)?+r.boardCols:5,prizes:r.prizes.map(p=>({name:p.name,qty:p.qty,left:p.left,isLose:!!p.isLose})),results:r.results.map(x=>({slot:x.slot,prize:x.prize,isLose:!!x.isLose,player:x.player,time:x.time})),status:r.status};}
 function emit(r){io.to(r.id).emit('room:update',pub(r));}
 function authRoom(req,res){const r=rooms.get(req.params.id.toUpperCase());if(!r||req.body.adminToken!==r.adminToken){res.status(403).json({ok:false,message:'主控驗證失敗'});return null;}return r;}
 function pickPrize(r){
@@ -95,7 +95,7 @@ app.post('/api/rooms/:id/save',(req,res)=>{
   r.balloonShape=shapes.includes(req.body.balloonShape)?req.body.balloonShape:'round';
   r.balloonFloat=req.body.balloonFloat!==false;
   r.eggStyle=req.body.eggStyle==='gold'?'gold':'color';
-  r.boardCols=[5,7,10].includes(+req.body.boardCols)?+req.body.boardCols:5;
+  r.boardCols=[5,7,8].includes(+req.body.boardCols)?+req.body.boardCols:5;
 
   r.prizes=winPrizes.map(({name,qty})=>{
     const already=drawnWins.get(name)||0;

@@ -66,7 +66,7 @@ function assetFor(i=0){
   if(room.mode==='balloon')return `/assets/balloon-${room.balloonShape||'round'}.png`;
   return `/assets/egg-${room.eggStyle==='gold'?'gold':'color'}-${String((i%(room.eggStyle==='gold'?8:16))+1).padStart(2,'0')}.png`;
 }
-function playerBoardCols(){return [5,7,10].includes(+room?.boardCols)?+room.boardCols:5;}
+function playerBoardCols(){return [5,7,8].includes(+room?.boardCols)?+room.boardCols:5;}
 function renderEntryArt(){
   if(!room)return;
   const srcs=room.mode==='balloon'?[assetFor(0),assetFor(0),assetFor(0)]:[assetFor(0),assetFor(1),assetFor(2)];
@@ -113,7 +113,7 @@ async function copyPlayerBoardImage(){
   const btn=$('copyPlayerBoardBtn'),oldText=btn.textContent;btn.disabled=true;btn.textContent='⏳ 產生整盤中…';
   let c=null,blob=null;
   try{
-    const cols=playerBoardCols(),cellW=cols>=10?108:(cols>=7?124:145),cellH=cellW,gap=cols>=10?5:8,pad=24,header=122,rows=Math.ceil(room.count/cols);
+    const cols=playerBoardCols(),cellW=cols>=8?116:(cols>=7?124:145),cellH=cellW,gap=cols>=8?6:8,pad=24,header=122,rows=Math.ceil(room.count/cols);
     c=document.createElement('canvas');const g=c.getContext('2d');c.width=pad*2+cols*cellW+(cols-1)*gap;c.height=header+rows*cellH+(rows-1)*gap+pad;
     const bg=g.createLinearGradient(0,0,c.width,c.height);bg.addColorStop(0,'#fff5fb');bg.addColorStop(1,'#eef5ff');g.fillStyle=bg;g.fillRect(0,0,c.width,c.height);
     g.textAlign='center';g.fillStyle='#4b3b74';g.font='900 34px Segoe UI,Arial';g.fillText(room.title||'歡樂抽獎',c.width/2,43);g.font='800 19px Segoe UI,Arial';g.fillStyle='#735e9e';g.fillText(room.mode==='balloon'?'🎈 戳氣球':'🥚 砸金蛋',c.width/2,75);g.font='700 15px Segoe UI,Arial';g.fillStyle='#8a7da0';g.fillText(`已抽 ${room.results.length} / ${room.count}`,c.width/2,101);

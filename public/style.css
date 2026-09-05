@@ -504,3 +504,38 @@ body.admin-body::after,body.login-body::after,body.player-body::after{right:-30p
   .player-body .user-sized-board.cols-10 .raffle-art{width:29px!important;height:29px!important}
   .player-body .user-sized-board.cols-10 .egg-art{width:25px!important;height:30px!important}
 }
+\n\n/* V1.1.5：主控盤面改為 5/7/8 格；8 格手機模式取代過小的 10 格 */
+.player-body .user-sized-board.cols-8{
+  --board-row-gap:2px;
+  column-gap:2px!important;
+}
+.player-body .user-sized-board.cols-8 .clean-tile{height:44px!important;min-height:44px!important}
+.player-body .user-sized-board.cols-8 .object-card,.player-body .user-sized-board.cols-8 .art-wrap{height:42px!important}
+.player-body .user-sized-board.cols-8 .raffle-art{width:40px!important;height:40px!important;max-width:100%!important}
+.player-body .user-sized-board.cols-8 .egg-art{width:34px!important;height:41px!important}
+.admin-body .admin-board.user-sized-board.cols-8{gap:3px!important}
+.admin-body .admin-board.user-sized-board.cols-8 .admin-item{height:46px!important;min-height:46px!important}
+.admin-body .admin-board.user-sized-board.cols-8 .art-wrap{height:44px!important}
+.admin-body .admin-board.user-sized-board.cols-8 .raffle-art{width:41px!important;height:41px!important}
+.admin-body .admin-board.user-sized-board.cols-8 .egg-art{width:35px!important;height:42px!important}
+.admin-body .admin-board.user-sized-board.cols-8 .admin-result-badge,
+.admin-body .admin-board.user-sized-board.cols-8 .lose-stamp-grid,
+.admin-body .admin-board.user-sized-board.cols-8 .grid-player-name{display:none!important}
+.admin-body .admin-board.user-sized-board.cols-8 .used:after{content:"✓";position:absolute;left:50%;bottom:1px;transform:translateX(-50%);z-index:10;font-size:9px;font-weight:1000;color:#755f86;background:#fff;border-radius:999px;padding:1px 4px}
+@media(max-width:430px){
+  .player-body .user-sized-board.cols-8{column-gap:1px!important;--board-row-gap:1px}
+  .player-body .user-sized-board.cols-8 .clean-tile{height:42px!important;min-height:42px!important}
+  .player-body .user-sized-board.cols-8 .object-card,.player-body .user-sized-board.cols-8 .art-wrap{height:40px!important}
+  .player-body .user-sized-board.cols-8 .raffle-art{width:38px!important;height:38px!important}
+  .player-body .user-sized-board.cols-8 .egg-art{width:32px!important;height:39px!important}
+  .admin-body .admin-board.user-sized-board.cols-8 .admin-item{height:43px!important;min-height:43px!important}
+  .admin-body .admin-board.user-sized-board.cols-8 .art-wrap{height:41px!important}
+  .admin-body .admin-board.user-sized-board.cols-8 .raffle-art{width:38px!important;height:38px!important}
+  .admin-body .admin-board.user-sized-board.cols-8 .egg-art{width:32px!important;height:39px!important}
+}
+@media(max-width:350px){
+  .player-body .user-sized-board.cols-8 .clean-tile{height:38px!important;min-height:38px!important}
+  .player-body .user-sized-board.cols-8 .object-card,.player-body .user-sized-board.cols-8 .art-wrap{height:37px!important}
+  .player-body .user-sized-board.cols-8 .raffle-art{width:35px!important;height:35px!important}
+  .player-body .user-sized-board.cols-8 .egg-art{width:30px!important;height:36px!important}
+}
