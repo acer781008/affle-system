@@ -15,6 +15,12 @@
     <h1 id="joinTitle">準備抽獎囉！</h1>
     <p id="entryMode" class="entry-mode">載入抽獎中…</p>
     <div id="entryNote" class="entry-note" style="display:none"></div>
+    <div id="entrySchedule" class="player-schedule-card" hidden>
+      <div class="schedule-title">⏳ 尚未開放抽獎</div>
+      <div id="entryStartAt" class="schedule-start-at"></div>
+      <div id="entryCountdown" class="schedule-countdown">--:--:--</div>
+      <div class="schedule-sub">時間到會自動開放，不用重新整理。</div>
+    </div>
     <div class="join-panel">
       <label for="nameInput">你的遊戲名</label>
       <input id="nameInput" class="input player-name-input" maxlength="30" autocomplete="off" placeholder="請輸入遊戲名">
@@ -32,6 +38,12 @@
     <div class="player-title-card">
       <h1 id="gameTitle"></h1>
       <div id="noteBox" class="note player-note" style="display:none"></div>
+      <div id="gameSchedule" class="player-schedule-card game-schedule" hidden>
+        <div class="schedule-title">⏳ 尚未開放抽獎</div>
+        <div id="gameStartAt" class="schedule-start-at"></div>
+        <div id="gameCountdown" class="schedule-countdown">--:--:--</div>
+        <div class="schedule-sub">時間到會自動開放抽獎。</div>
+      </div>
       <div id="hint" class="player-hint"></div>
       <div class="player-board-tools">
         
@@ -53,7 +65,7 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const $=id=>document.getElementById(id),qs=new URLSearchParams(location.search),roomId=(qs.get('room')||'').toUpperCase(),socket=io();
-let room=null,player='',spinning=false,hasDrawn=false,audioCtx=null,lastResult=null;
+let room=null,player='',spinning=false,hasDrawn=false,audioCtx=null,lastResult=null,serverOffsetMs=0,scheduleWasPending=false;let scheduleTimer=null;
 const DEVICE_KEY='raffleDeviceId';
 let deviceId=localStorage.getItem(DEVICE_KEY);
 if(!deviceId){deviceId=(crypto?.randomUUID?.()||('dev-'+Date.now()+'-'+Math.random().toString(36).slice(2)));localStorage.setItem(DEVICE_KEY,deviceId);}
@@ -67,30 +79,40 @@ function assetFor(i=0){
   return `/assets/egg-${room.eggStyle==='gold'?'gold':'color'}-${String((i%(room.eggStyle==='gold'?8:16))+1).padStart(2,'0')}.png`;
 }
 function playerBoardCols(){return [5,7,8].includes(+room?.boardCols)?+room.boardCols:5;}
+function syncServerClock(r){if(r?.serverNow){const t=Date.parse(r.serverNow);if(Number.isFinite(t))serverOffsetMs=t-Date.now();}}
+function serverNowMs(){return Date.now()+serverOffsetMs;}
+function hasSchedule(){return !!(room?.useScheduledStart&&room?.startAt&&Number.isFinite(Date.parse(room.startAt)));}
+function beforeScheduledStart(){return hasSchedule()&&serverNowMs()<Date.parse(room.startAt);}
+function formatStartAt(){if(!hasSchedule())return '';return new Date(room.startAt).toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});}
+function countdownText(){if(!beforeScheduledStart())return '00:00:00';let sec=Math.max(0,Math.ceil((Date.parse(room.startAt)-serverNowMs())/1000)),days=Math.floor(sec/86400);sec%=86400;const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60,p=n=>String(n).padStart(2,'0');return days>0?`${days}天 ${p(h)}:${p(m)}:${p(s)}`:`${p(h)}:${p(m)}:${p(s)}`;}
+function updateScheduleUI(){if(!room)return;const pending=beforeScheduledStart(),show=hasSchedule()&&pending;for(const id of ['entrySchedule','gameSchedule'])$(id).hidden=!show;if(hasSchedule()){const at=`開賽時間：${formatStartAt()}`;$('entryStartAt').textContent=at;$('gameStartAt').textContent=at;}if(show){const cd=countdownText();$('entryCountdown').textContent=cd;$('gameCountdown').textContent=cd;}if(scheduleWasPending&&!pending){scheduleWasPending=false;if(player)render();else renderEntryArt();}else scheduleWasPending=pending;}
+function startScheduleTicker(){if(scheduleTimer)clearInterval(scheduleTimer);scheduleTimer=setInterval(updateScheduleUI,500);updateScheduleUI();}
 function renderEntryArt(){
   if(!room)return;
   const srcs=room.mode==='balloon'?[assetFor(0),assetFor(0),assetFor(0)]:[assetFor(0),assetFor(1),assetFor(2)];
   $('entryArt').innerHTML=srcs.map((s,i)=>`<img class="entry-object e${i+1} ${room.mode==='balloon'&&room.balloonFloat?'entry-float':''}" src="${s}" alt="">`).join('');
   $('entryMode').textContent=room.mode==='balloon'?'🎈 戳氣球｜挑一顆你最有感覺的氣球':'🥚 砸金蛋｜挑一顆幸運金蛋';
   document.querySelector('.entry-rule').textContent=room.limitOnePerPlayer!==false?'每人限抽一次・重新整理也不能再抽 🍀':'本場允許重複抽獎・選一個你喜歡的圖案試試手氣 🍀';
-  $('entryNote').style.display=room.note?'block':'none';$('entryNote').textContent=room.note||'';
+  $('joinBtn').textContent=beforeScheduledStart()?'⏳ 進入等待':'✨ 開始抽獎';
+  $('entryNote').style.display=room.note?'block':'none';$('entryNote').textContent=room.note||'';updateScheduleUI();
 }
 async function loadRoom(){
-  try{const resp=await fetch('/api/rooms/'+encodeURIComponent(roomId)),j=await resp.json();if(!j.ok){$('msg').textContent='找不到這場抽獎，可能已刪除或伺服器剛重啟。';$('joinBtn').disabled=true;return;}room=j.room;$('joinTitle').textContent=room.title||'歡樂抽獎活動';renderEntryArt();}
+  try{const resp=await fetch('/api/rooms/'+encodeURIComponent(roomId)),j=await resp.json();if(!j.ok){$('msg').textContent='找不到這場抽獎，可能已刪除或伺服器剛重啟。';$('joinBtn').disabled=true;return;}room=j.room;syncServerClock(room);$('joinTitle').textContent=room.title||'歡樂抽獎活動';renderEntryArt();startScheduleTicker();}
   catch(e){$('msg').textContent='目前無法連線到抽獎系統，請重新整理再試。';}
 }
-socket.on('room:update',r=>{room=r;if(!player){$('joinTitle').textContent=room.title;renderEntryArt();}else if(!spinning)render();});
+socket.on('room:update',r=>{room=r;syncServerClock(room);if(!player){$('joinTitle').textContent=room.title;renderEntryArt();}else if(!spinning)render();updateScheduleUI();});
 socket.on('room:deleted',()=>{alert('這場抽獎已被主控刪除');location.reload();});
 $('joinBtn').addEventListener('click',join);$('nameInput').addEventListener('keydown',e=>{if(e.key==='Enter')join();});
 async function join(){
   if(!room){$('msg').textContent='抽獎尚未載入完成，請重新整理頁面。';return;}
   player=$('nameInput').value.trim();if(!player){$('msg').textContent='請先輸入遊戲名';return;}
-  try{const j=await fetch('/api/rooms/'+roomId+'/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:player,deviceId})}).then(r=>r.json());if(!j.ok){$('msg').textContent=j.message||'無法進入抽獎';return;}room=j.room;$('joinCard').style.display='none';$('game').style.display='block';render();window.scrollTo({top:0,behavior:'smooth'});}
+  try{const j=await fetch('/api/rooms/'+roomId+'/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:player,deviceId})}).then(r=>r.json());if(!j.ok){$('msg').textContent=j.message||'無法進入抽獎';return;}room=j.room;syncServerClock(room);$('joinCard').style.display='none';$('game').style.display='block';render();window.scrollTo({top:0,behavior:'smooth'});}
   catch(e){$('msg').textContent='連線失敗，請重新整理再試。';}
 }
-function render(){if(!room)return;$('gameTitle').textContent=room.title;$('noteBox').style.display=room.note?'block':'none';$('noteBox').textContent=room.note||'';renderGrid();}
+function render(){if(!room)return;$('gameTitle').textContent=room.title;$('noteBox').style.display=room.note?'block':'none';$('noteBox').textContent=room.note||'';updateScheduleUI();renderGrid();}
 function renderGrid(){
   const cols=playerBoardCols();
+  if(beforeScheduledStart()){$('hint').textContent='⏳ 尚未開放，倒數結束後會自動顯示抽獎盤。';$('area').innerHTML='<div class="schedule-waiting-board">🎈🥚<b>抽獎即將開始</b><span>可以留在這個頁面等待，不用重新整理。</span></div>';return;}
   $('hint').textContent=room.mode==='balloon'?'🎈 點一顆還沒被戳過的氣球':'🥚 點一顆還沒被砸過的金蛋';
   const used=new Map(room.results.map(x=>[x.slot,x]));
   $('area').innerHTML='<div class="player-board-card"><div class="board clean-board mobile-board user-sized-board cols-'+cols+'" style="--board-cols:'+cols+'">'+Array.from({length:room.count},(_,i)=>{
@@ -150,6 +172,7 @@ $('resultModal').addEventListener('click',e=>{if(e.target&&e.target.hasAttribute
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('resultModal').hidden)closeResultModal();});
 
 async function draw(slot){
+  if(beforeScheduledStart()){updateScheduleUI();return;}
   if(spinning||hasDrawn)return;spinning=true;room.mode==='balloon'?popSound():crackSound();
   try{
     const j=await fetch('/api/rooms/'+roomId+'/draw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player,slot,deviceId})}).then(r=>r.json());
