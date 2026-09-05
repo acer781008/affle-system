@@ -411,3 +411,96 @@ body.admin-body::after,body.login-body::after,body.player-body::after{right:-30p
   .player-body .user-sized-board.cols-5 .raffle-art{width:54px!important;height:54px!important}
   .player-body .user-sized-board.cols-5 .egg-art{width:46px!important;height:57px!important}
 }
+
+
+/* V1.1.4：手機盤面真正緊湊化；移除舊 object-card 固定高度與大白底 */
+.player-body .player-board-card{
+  background:rgba(255,255,255,.20)!important;
+  border:1px solid rgba(255,255,255,.38)!important;
+  box-shadow:none!important;
+  padding:5px!important;
+  border-radius:18px!important;
+}
+.player-body .clean-board.user-sized-board{
+  align-items:start!important;
+  grid-auto-rows:auto!important;
+  row-gap:var(--board-row-gap,4px)!important;
+}
+.player-body .clean-board.user-sized-board .clean-tile,
+.player-body .clean-board.user-sized-board .object-card,
+.player-body .clean-board.user-sized-board .art-wrap{
+  min-height:0!important;
+  height:auto!important;
+}
+.player-body .clean-board.user-sized-board .object-card{
+  display:flex!important;
+  justify-content:flex-start!important;
+  align-items:center!important;
+}
+.player-body .clean-board.user-sized-board .art-wrap{
+  flex:0 0 auto!important;
+  width:100%!important;
+}
+
+/* 5 格：維持最好點擊的大小 */
+.player-body .user-sized-board.cols-5{
+  --board-row-gap:5px;
+  column-gap:5px!important;
+}
+.player-body .user-sized-board.cols-5 .clean-tile{min-height:66px!important;height:66px!important}
+.player-body .user-sized-board.cols-5 .object-card,.player-body .user-sized-board.cols-5 .art-wrap{height:64px!important}
+.player-body .user-sized-board.cols-5 .raffle-art{width:58px!important;height:58px!important}
+.player-body .user-sized-board.cols-5 .egg-art{width:50px!important;height:61px!important}
+
+/* 7 格：中等密度 */
+.player-body .user-sized-board.cols-7{
+  --board-row-gap:3px;
+  column-gap:3px!important;
+}
+.player-body .user-sized-board.cols-7 .clean-tile{min-height:49px!important;height:49px!important}
+.player-body .user-sized-board.cols-7 .object-card,.player-body .user-sized-board.cols-7 .art-wrap{height:47px!important}
+.player-body .user-sized-board.cols-7 .raffle-art{width:45px!important;height:45px!important}
+.player-body .user-sized-board.cols-7 .egg-art{width:38px!important;height:46px!important}
+
+/* 10 格：不要縮成小點，盡量吃滿每個欄寬 */
+.player-body .user-sized-board.cols-10{
+  --board-row-gap:2px;
+  column-gap:1px!important;
+}
+.player-body .user-sized-board.cols-10 .clean-tile{min-height:37px!important;height:37px!important}
+.player-body .user-sized-board.cols-10 .object-card,.player-body .user-sized-board.cols-10 .art-wrap{height:35px!important}
+.player-body .user-sized-board.cols-10 .raffle-art{width:34px!important;height:34px!important;max-width:100%!important}
+.player-body .user-sized-board.cols-10 .egg-art{width:29px!important;height:35px!important}
+
+/* 主控盤也同步去除舊固定高度，避免 7/10 格時空白過長 */
+.admin-body .admin-board.user-sized-board .admin-item,
+.admin-body .admin-board.user-sized-board .art-wrap{
+  min-height:0!important;
+}
+.admin-body .admin-board.user-sized-board.cols-7 .admin-item{height:52px!important}
+.admin-body .admin-board.user-sized-board.cols-7 .art-wrap{height:50px!important}
+.admin-body .admin-board.user-sized-board.cols-10 .admin-item{height:39px!important}
+.admin-body .admin-board.user-sized-board.cols-10 .art-wrap{height:37px!important}
+
+@media(max-width:430px){
+  .player-body .player-board-card{padding:3px!important;border-radius:15px!important}
+  .player-body .user-sized-board.cols-5{column-gap:4px!important;--board-row-gap:4px}
+  .player-body .user-sized-board.cols-5 .clean-tile{height:64px!important;min-height:64px!important}
+  .player-body .user-sized-board.cols-5 .object-card,.player-body .user-sized-board.cols-5 .art-wrap{height:62px!important}
+  .player-body .user-sized-board.cols-5 .raffle-art{width:56px!important;height:56px!important}
+  .player-body .user-sized-board.cols-7{column-gap:2px!important;--board-row-gap:2px}
+  .player-body .user-sized-board.cols-7 .clean-tile{height:47px!important;min-height:47px!important}
+  .player-body .user-sized-board.cols-7 .object-card,.player-body .user-sized-board.cols-7 .art-wrap{height:45px!important}
+  .player-body .user-sized-board.cols-7 .raffle-art{width:43px!important;height:43px!important}
+  .player-body .user-sized-board.cols-10{column-gap:1px!important;--board-row-gap:1px}
+  .player-body .user-sized-board.cols-10 .clean-tile{height:35px!important;min-height:35px!important}
+  .player-body .user-sized-board.cols-10 .object-card,.player-body .user-sized-board.cols-10 .art-wrap{height:34px!important}
+  .player-body .user-sized-board.cols-10 .raffle-art{width:33px!important;height:33px!important}
+}
+
+@media(max-width:350px){
+  .player-body .user-sized-board.cols-10 .clean-tile{height:31px!important;min-height:31px!important}
+  .player-body .user-sized-board.cols-10 .object-card,.player-body .user-sized-board.cols-10 .art-wrap{height:30px!important}
+  .player-body .user-sized-board.cols-10 .raffle-art{width:29px!important;height:29px!important}
+  .player-body .user-sized-board.cols-10 .egg-art{width:25px!important;height:30px!important}
+}
