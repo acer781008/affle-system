@@ -1,0 +1,78 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><title>分享整個遊戲畫面</title>
+<style>
+#canvasWrap{overflow:auto;background:#eee9ff;border-radius:20px;padding:14px}
+canvas{display:block;margin:auto;background:white;box-shadow:0 12px 30px #0002;border-radius:20px;max-width:100%;height:auto}
+</style></head><body>
+<div class="top"><div class="brand">🖼️ 分享整個遊戲畫面</div></div>
+<div class="wrap">
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <div><h2 style="margin:0">整個遊戲畫面</h2><div class="muted">會把目前的氣球／金蛋／轉盤場景、已開結果與玩家名一起做成圖片。</div></div>
+      <div class="row"><button class="btn primary" id="copyBtn">📋 複製圖片</button><button class="btn pink" id="downloadBtn">⬇️ 下載 PNG</button></div>
+    </div>
+  </div>
+  <div id="canvasWrap" style="margin-top:16px"><canvas id="boardCanvas"></canvas></div>
+  <p id="msg" class="muted"></p>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const id=(new URLSearchParams(location.search).get('room')||'').toUpperCase();
+let room=null;
+function rr(ctx,x,y,w,h,r,fill){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill()}
+function text(ctx,t,x,y,size=18,weight=700,color='#4b3b74',align='center'){ctx.font=`${weight} ${size}px Segoe UI, Arial`;ctx.fillStyle=color;ctx.textAlign=align;ctx.fillText(t,x,y)}
+function drawBalloon(ctx,cx,cy,num,res){
+  ctx.save();
+  ctx.beginPath();ctx.ellipse(cx,cy,36,47,0,0,Math.PI*2);
+  ctx.fillStyle=res?'#cfcbd7':'#ff6fae';ctx.fill();
+  ctx.beginPath();ctx.moveTo(cx-7,cy+44);ctx.lineTo(cx,cy+54);ctx.lineTo(cx+7,cy+44);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='#997b9e';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(cx,cy+54);ctx.quadraticCurveTo(cx+12,cy+70,cx,cy+84);ctx.stroke();
+  rr(ctx,cx-18,cy-15,36,30,15,'#ffffffee');text(ctx,String(num),cx,cy+6,16,900,'#5b4774');
+  if(res){text(ctx,res.prize,cx,cy+104,13,800,'#51475f');text(ctx,res.player,cx,cy+121,12,700,'#756d7d');}
+  ctx.restore();
+}
+function drawEgg(ctx,cx,cy,num,res){
+  ctx.save();ctx.beginPath();ctx.ellipse(cx,cy,37,49,0,0,Math.PI*2);
+  let g=ctx.createLinearGradient(cx-25,cy-40,cx+30,cy+45);
+  g.addColorStop(0,res?'#d8d5da':'#fff29a');g.addColorStop(.45,res?'#c7c3cb':'#ffd33f');g.addColorStop(1,res?'#aaa5b0':'#e99a08');
+  ctx.fillStyle=g;ctx.fill();ctx.lineWidth=3;ctx.strokeStyle=res?'#bdb8c4':'#fff0a0';ctx.stroke();
+  text(ctx,'★',cx,cy+5,26,900,res?'#eceaf0':'#fff8b7');
+  rr(ctx,cx-18,cy+27,36,26,13,'#ffffffef');text(ctx,String(num),cx,cy+46,14,900,'#765100');
+  if(res){text(ctx,res.prize,cx,cy+78,13,800,'#51475f');text(ctx,res.player,cx,cy+95,12,700,'#756d7d');}
+  ctx.restore();
+}
+function renderGrid(c,ctx){
+  const count=room.count,cols=Math.min(8,Math.max(4,Math.ceil(Math.sqrt(count))));
+  const cellW=130,cellH=150,gap=14,pad=36,header=190,rows=Math.ceil(count/cols);
+  c.width=pad*2+cols*cellW+(cols-1)*gap;c.height=header+rows*cellH+(rows-1)*gap+pad;
+  let bg=ctx.createLinearGradient(0,0,c.width,c.height);bg.addColorStop(0,'#fff5fb');bg.addColorStop(1,'#eef4ff');ctx.fillStyle=bg;ctx.fillRect(0,0,c.width,c.height);
+  text(ctx,room.title,c.width/2,52,36,900);
+  text(ctx,room.mode==='balloon'?'🎈 戳氣球':'🥚 砸金蛋',c.width/2,88,22,800,'#725aa0');
+  if(room.note){rr(ctx,60,108,c.width-120,48,14,'#fff8dc');text(ctx,room.note.slice(0,80),c.width/2,139,15,700,'#796843');}
+  text(ctx,`已開 ${room.results.length} / ${count}`,c.width/2,178,15,700,'#86799e');
+  const used=new Map(room.results.map(x=>[x.slot,x]));
+  for(let i=0;i<count;i++){const col=i%cols,row=Math.floor(i/cols),cx=pad+col*(cellW+gap)+cellW/2,cy=header+row*(cellH+gap)+55,n=i+1,res=used.get(n);room.mode==='balloon'?drawBalloon(ctx,cx,cy,n,res):drawEgg(ctx,cx,cy,n,res)}
+}
+function renderWheel(c,ctx){
+  c.width=920;c.height=760;
+  let bg=ctx.createLinearGradient(0,0,c.width,c.height);bg.addColorStop(0,'#fff5fb');bg.addColorStop(1,'#eef4ff');ctx.fillStyle=bg;ctx.fillRect(0,0,c.width,c.height);
+  text(ctx,room.title,460,52,36,900);text(ctx,'🎡 幸運轉盤',460,90,22,800,'#725aa0');
+  if(room.note){rr(ctx,120,112,680,48,14,'#fff8dc');text(ctx,room.note.slice(0,80),460,143,15,700,'#796843');}
+  const cx=460,cy=390,r=220,items=room.prizes.filter(p=>p.left>0);
+  const n=Math.max(1,items.length),colors=['#ff8bb7','#ffd25e','#7bd8d0','#9b8cff','#ff9b74','#86c7ff'];
+  for(let i=0;i<n;i++){ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,(i/n)*Math.PI*2- Math.PI/2,((i+1)/n)*Math.PI*2-Math.PI/2);ctx.closePath();ctx.fillStyle=colors[i%colors.length];ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.stroke();
+    const a=((i+.5)/n)*Math.PI*2-Math.PI/2;const tx=cx+Math.cos(a)*135,ty=cy+Math.sin(a)*135;text(ctx,(items[i]?.name||'').slice(0,10),tx,ty,15,900,'#4b3b74');
+  }
+  ctx.beginPath();ctx.arc(cx,cy,66,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();text(ctx,'🎁',cx,cy+20,48,900);
+  text(ctx,'▼',cx,cy-r-10,40,900,'#ff5f76');
+  text(ctx,`目前已完成 ${room.results.length} 抽`,460,655,18,800,'#6d5a8e');
+  if(room.results.length){const last=room.results[room.results.length-1];rr(ctx,210,680,500,48,16,'#fff7d7');text(ctx,`最新：${last.prize}｜${last.player}`,460,711,17,800,'#5f4b70');}
+}
+async function render(){
+  const j=await fetch('/api/rooms/'+id).then(r=>r.json()).catch(()=>null);
+  if(!j||!j.ok){$('msg').textContent='找不到這場活動';return;}
+  room=j.room;const c=$('boardCanvas'),ctx=c.getContext('2d');room.mode==='wheel'?renderWheel(c,ctx):renderGrid(c,ctx);
+}
+$('downloadBtn').onclick=()=>{const a=document.createElement('a');a.download=(room?.title||'抽獎遊戲畫面')+'.png';a.href=$('boardCanvas').toDataURL('image/png');a.click()};
+$('copyBtn').onclick=async()=>{try{const blob=await new Promise(r=>$('boardCanvas').toBlob(r,'image/png'));await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);$('msg').textContent='整個遊戲畫面已複製。'}catch(e){$('msg').textContent='此瀏覽器不允許直接複製圖片，請用「下載 PNG」。'}};
+render();
+</script></body></html>

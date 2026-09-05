@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 260">
+  <defs>
+    <linearGradient id="pink" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff9fc5"/><stop offset="0.48" stop-color="#ff5f9d"/><stop offset="1" stop-color="#e43b7e"/>
+    </linearGradient>
+    <linearGradient id="soft" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#fffdfc"/><stop offset="1" stop-color="#fff2f7"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="8" stdDeviation="7" flood-color="#9a3567" flood-opacity=".25"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <path d="M68 170 L45 242 L90 222 L119 251 L131 180 Z" fill="#e63f80" stroke="#fff" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M171 170 L195 242 L151 222 L120 251 L110 180 Z" fill="#f15a93" stroke="#fff" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M120 10 C138 19 147 14 163 22 C177 35 191 34 201 50 C205 68 219 76 216 95 C208 112 217 125 205 141 C189 151 190 167 173 176 C154 178 146 191 126 186 C110 176 95 187 79 176 C69 161 53 162 46 145 C47 127 32 118 36 99 C46 84 37 70 49 55 C65 47 66 31 83 23 C100 24 106 11 120 10 Z" fill="url(#pink)" stroke="#fff" stroke-width="10"/>
+    <circle cx="120" cy="99" r="73" fill="url(#soft)" stroke="#ffd2e2" stroke-width="5"/>
+    <circle cx="120" cy="99" r="62" fill="none" stroke="#ff7cad" stroke-width="3" stroke-dasharray="7 7"/>
+    <path d="M76 63 C94 48 109 48 122 56" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".8"/>
+    <text x="120" y="93" text-anchor="middle" font-family="Microsoft JhengHei,Noto Sans TC,sans-serif" font-size="31" font-weight="900" fill="#d93b78">再接</text>
+    <text x="120" y="129" text-anchor="middle" font-family="Microsoft JhengHei,Noto Sans TC,sans-serif" font-size="31" font-weight="900" fill="#d93b78">再厲</text>
+    <g fill="#ffb7cf">
+      <path d="M65 108 l5 10 11 2-8 8 2 11-10-5-10 5 2-11-8-8 11-2z"/>
+      <path d="M176 66 l4 8 9 1-7 6 2 9-8-4-8 4 2-9-7-6 9-1z"/>
+    </g>
+  </g>
+</svg>

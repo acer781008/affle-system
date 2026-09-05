@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="stylesheet" href="style.css">
+<title>歡樂抽獎</title>
+</head>
+<body class="player-body">
+<div class="player-shell">
+  <section id="joinCard" class="player-entry-card">
+    <div class="entry-spark s1">✦</div><div class="entry-spark s2">✦</div><div class="entry-spark s3">★</div>
+    <div id="entryArt" class="entry-art"></div>
+    <div class="entry-badge">🎉 歡樂抽獎</div>
+    <h1 id="joinTitle">準備抽獎囉！</h1>
+    <p id="entryMode" class="entry-mode">載入抽獎中…</p>
+    <div id="entryNote" class="entry-note" style="display:none"></div>
+    <div class="join-panel">
+      <label for="nameInput">你的遊戲名</label>
+      <input id="nameInput" class="input player-name-input" maxlength="30" autocomplete="off" placeholder="請輸入遊戲名">
+      <button id="joinBtn" class="btn player-start">✨ 開始抽獎</button>
+      <div id="msg" class="player-msg"></div>
+    </div>
+    <div class="entry-rule">每人限抽一次・選一個你喜歡的圖案試試手氣 🍀</div>
+  </section>
+
+  <section id="game" style="display:none">
+    <div class="player-game-head">
+      <div class="mini-brand">🎪 歡樂抽獎</div>
+      <div id="roomTag" class="room-chip"></div>
+    </div>
+    <div class="player-title-card">
+      <h1 id="gameTitle"></h1>
+      <div id="noteBox" class="note player-note" style="display:none"></div>
+      <div id="hint" class="player-hint"></div>
+      <button id="copyPlayerBoardBtn" class="btn player-copy-board" type="button" onclick="copyPlayerBoardImage()">🖼️ 複製整盤抽獎畫面</button>
+    </div>
+    <div id="area"></div>
+    <div id="result"></div>
+  </section>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const $=id=>document.getElementById(id),qs=new URLSearchParams(location.search),roomId=(qs.get('room')||'').toUpperCase(),socket=io();
+let room=null,player='',spinning=false,hasDrawn=false,audioCtx=null;
+const DEVICE_KEY='raffleDeviceId';
+let deviceId=localStorage.getItem(DEVICE_KEY);
+if(!deviceId){deviceId=(crypto?.randomUUID?.()||('dev-'+Date.now()+'-'+Math.random().toString(36).slice(2)));localStorage.setItem(DEVICE_KEY,deviceId);}
+$('roomTag').textContent=roomId?'抽獎 '+roomId:'';
+if(!roomId){$('msg').textContent='這個玩家網址缺少抽獎代碼，請重新向主控索取網址。';$('joinBtn').disabled=true;}else{socket.emit('room:join',roomId);loadRoom();}
+
+function assetFor(i=0){
+  if(!room)return '/assets/balloon-round.png';
+  if(room.mode==='balloon')return `/assets/balloon-${room.balloonShape||'round'}.png`;
+  return `/assets/egg-${room.eggStyle==='gold'?'gold':'color'}-${String((i%(room.eggStyle==='gold'?8:16))+1).padStart(2,'0')}.png`;
+}
+function renderEntryArt(){
+  if(!room)return;
+  const srcs=room.mode==='balloon'?[assetFor(0),assetFor(0),assetFor(0)]:[assetFor(0),assetFor(1),assetFor(2)];
+  $('entryArt').innerHTML=srcs.map((s,i)=>`<img class="entry-object e${i+1} ${room.mode==='balloon'&&room.balloonFloat?'entry-float':''}" src="${s}" alt="">`).join('');
+  $('entryMode').textContent=room.mode==='balloon'?'🎈 戳氣球｜挑一顆你最有感覺的氣球':'🥚 砸金蛋｜挑一顆幸運金蛋';
+  document.querySelector('.entry-rule').textContent=room.limitOnePerPlayer!==false?'每人限抽一次・重新整理也不能再抽 🍀':'本場允許重複抽獎・選一個你喜歡的圖案試試手氣 🍀';
+  $('entryNote').style.display=room.note?'block':'none';$('entryNote').textContent=room.note||'';
+}
+async function loadRoom(){
+  try{const resp=await fetch('/api/rooms/'+encodeURIComponent(roomId)),j=await resp.json();if(!j.ok){$('msg').textContent='找不到這場抽獎，可能已刪除或伺服器剛重啟。';$('joinBtn').disabled=true;return;}room=j.room;$('joinTitle').textContent=room.title||'歡樂抽獎活動';renderEntryArt();}
+  catch(e){$('msg').textContent='目前無法連線到抽獎系統，請重新整理再試。';}
+}
+socket.on('room:update',r=>{room=r;if(!player){$('joinTitle').textContent=room.title;renderEntryArt();}else if(!spinning)render();});
+socket.on('room:deleted',()=>{alert('這場抽獎已被主控刪除');location.reload();});
+$('joinBtn').addEventListener('click',join);$('nameInput').addEventListener('keydown',e=>{if(e.key==='Enter')join();});
+async function join(){
+  if(!room){$('msg').textContent='抽獎尚未載入完成，請重新整理頁面。';return;}
+  player=$('nameInput').value.trim();if(!player){$('msg').textContent='請先輸入遊戲名';return;}
+  try{const j=await fetch('/api/rooms/'+roomId+'/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:player,deviceId})}).then(r=>r.json());if(!j.ok){$('msg').textContent=j.message||'無法進入抽獎';return;}room=j.room;$('joinCard').style.display='none';$('game').style.display='block';render();window.scrollTo({top:0,behavior:'smooth'});}
+  catch(e){$('msg').textContent='連線失敗，請重新整理再試。';}
+}
+function render(){if(!room)return;$('gameTitle').textContent=room.title;$('noteBox').style.display=room.note?'block':'none';$('noteBox').textContent=room.note||'';renderGrid();}
+function renderGrid(){
+  $('hint').textContent=room.mode==='balloon'?'🎈 點一顆還沒被戳過的氣球':'🥚 點一顆還沒被砸過的金蛋';
+  const used=new Map(room.results.map(x=>[x.slot,x]));
+  $('area').innerHTML='<div class="player-board-card"><div class="board clean-board mobile-board">'+Array.from({length:room.count},(_,i)=>{
+    const n=i+1,x=used.get(n),asset=assetFor(i),imgClass=`raffle-art ${room.mode==='egg'?'egg-art':''} ${room.mode==='balloon'&&room.balloonFloat&&!x?'float-art':''}`;
+    const resultOverlay=x?(isLoseResult(x)?`<img class="lose-stamp-grid player-stamp" src="/assets/lose-stamp.svg?v=110" alt="再接再厲">${x.player?`<div class="grid-player-name lose-player">${escapeHtml(x.player)}</div>`:''}`:`<div class="draw-info win-info"><div class="tile-prize">🎉 ${escapeHtml(x.prize)}</div>${x.player?`<div class="tile-player">${escapeHtml(x.player)}</div>`:''}</div>`):'';
+    return `<button class="tile clean-tile ${x?'used':''}" ${x||(room.limitOnePerPlayer!==false&&hasDrawn)?'disabled':''} aria-label="抽獎物件 ${n}" onclick="draw(${n})"><div class="object-card"><div class="art-wrap"><img class="${imgClass}" style="--delay:-${(i%11)*.13}s;--dur:${1.9+(i%8)*.19}s;--drift:${8+(i%5)*2}px" src="${asset}" alt=""></div>${resultOverlay}</div></button>`;
+  }).join('')+'</div></div>';
+}
+function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+function isLoseResult(x){return !!(x&&(x.isLose||/^(再接再厲|未中獎|沒中獎|謝謝惠顧|銘謝惠顧)$/u.test(String(x.prize||'').trim())));}
+function ctx(){if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume();return audioCtx;}
+function popSound(){try{const c=ctx(),len=Math.floor(c.sampleRate*.13),b=c.createBuffer(1,len,c.sampleRate),d=b.getChannelData(0);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*(1-i/len);const s=c.createBufferSource(),f=c.createBiquadFilter(),g=c.createGain();f.type='highpass';f.frequency.value=420;s.buffer=b;s.connect(f);f.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.32,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.13);s.start();}catch(e){}}
+function crackSound(){try{const c=ctx();[0,.055,.105].forEach((t,i)=>{const o=c.createOscillator(),g=c.createGain();o.type='triangle';o.frequency.setValueAtTime(520-i*90,c.currentTime+t);o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.16,c.currentTime+t);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+t+.06);o.start(c.currentTime+t);o.stop(c.currentTime+t+.07);});}catch(e){}}
+function winSound(){try{const c=ctx();[659,784,988,1319].forEach((f,i)=>{const o=c.createOscillator(),g=c.createGain(),t=c.currentTime+i*.11;o.type='sine';o.frequency.value=f;o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.13,t);g.gain.exponentialRampToValueAtTime(.001,t+.28);o.start(t);o.stop(t+.3);});}catch(e){}}
+function loseSound(){try{const c=ctx();[392,330,262].forEach((f,i)=>{const o=c.createOscillator(),g=c.createGain(),t=c.currentTime+i*.13;o.type='sine';o.frequency.value=f;o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.09,t);g.gain.exponentialRampToValueAtTime(.001,t+.22);o.start(t);o.stop(t+.24);});}catch(e){}}
+
+function loadBoardImage(src){return new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=reject;im.src=src;});}
+async function copyPlayerBoardImage(){
+  if(!room)return;
+  const btn=$('copyPlayerBoardBtn'),oldText=btn.textContent;btn.disabled=true;btn.textContent='⏳ 產生整盤中…';
+  let c=null,blob=null;
+  try{
+    const cols=Math.min(8,Math.max(3,Math.ceil(Math.sqrt(room.count)))),cellW=150,cellH=150,gap=12,pad=28,header=122,rows=Math.ceil(room.count/cols);
+    c=document.createElement('canvas');const g=c.getContext('2d');c.width=pad*2+cols*cellW+(cols-1)*gap;c.height=header+rows*cellH+(rows-1)*gap+pad;
+    const bg=g.createLinearGradient(0,0,c.width,c.height);bg.addColorStop(0,'#fff5fb');bg.addColorStop(1,'#eef5ff');g.fillStyle=bg;g.fillRect(0,0,c.width,c.height);
+    g.textAlign='center';g.fillStyle='#4b3b74';g.font='900 34px Segoe UI,Arial';g.fillText(room.title||'歡樂抽獎',c.width/2,43);g.font='800 19px Segoe UI,Arial';g.fillStyle='#735e9e';g.fillText(room.mode==='balloon'?'🎈 戳氣球':'🥚 砸金蛋',c.width/2,75);g.font='700 15px Segoe UI,Arial';g.fillStyle='#8a7da0';g.fillText(`已抽 ${room.results.length} / ${room.count}`,c.width/2,101);
+    const used=new Map(room.results.map(x=>[x.slot,x])),cache=new Map();
+    async function getAsset(i){const src=assetFor(i);if(!cache.has(src))cache.set(src,await loadBoardImage(src));return cache.get(src);}
+    const stamp=await loadBoardImage('/assets/lose-stamp.svg');
+    function txt(t,x,y,size=13,weight=800,color='#51475f'){g.font=`${weight} ${size}px Segoe UI,Arial`;g.fillStyle=color;g.textAlign='center';g.fillText(t,x,y);}
+    for(let i=0;i<room.count;i++){
+      const col=i%cols,row=Math.floor(i/cols),x=pad+col*(cellW+gap),y=header+row*(cellH+gap),res=used.get(i+1),im=await getAsset(i);
+      g.save();g.globalAlpha=res?0.35:1;const iw=room.mode==='egg'?96:118,ih=room.mode==='egg'?112:118;g.drawImage(im,x+(cellW-iw)/2,y+4,iw,ih);g.restore();
+      if(res&&isLoseResult(res)){g.drawImage(stamp,x+38,y+20,74,84);if(res.player)txt(String(res.player).slice(0,14),x+cellW/2,y+143,10,800,'#7a6071');}
+      else if(res){g.fillStyle='#ffffffef';g.beginPath();if(g.roundRect)g.roundRect(x+7,y+112,cellW-14,32,10);else g.rect(x+7,y+112,cellW-14,32);g.fill();txt(String(res.prize).slice(0,15),x+cellW/2,y+126,12,900,'#d84f83');if(res.player)txt(String(res.player).slice(0,15),x+cellW/2,y+141,10,800,'#665679');}
+    }
+    blob=await new Promise(r=>c.toBlob(r,'image/png'));
+    if(navigator.clipboard&&window.ClipboardItem){
+      await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+      btn.textContent='✅ 整盤已複製';
+    }else throw new Error('clipboard-image-not-supported');
+  }catch(e){
+    if(blob&&navigator.share&&window.File){
+      try{const file=new File([blob],(room.title||'抽獎整盤')+'.png',{type:'image/png'});if(!navigator.canShare||navigator.canShare({files:[file]})){await navigator.share({files:[file],title:room.title||'抽獎整盤'});btn.textContent='✅ 整盤圖片已開啟分享';return;}}catch(_){}
+    }
+    if(c){const a=document.createElement('a');a.download=(room.title||'抽獎整盤')+'.png';a.href=c.toDataURL('image/png');a.click();btn.textContent='📱 已改存成整盤圖片';}
+    else btn.textContent='❌ 整盤圖片產生失敗';
+  }finally{setTimeout(()=>{btn.disabled=false;btn.textContent=oldText;},2500);}
+}
+
+async function draw(slot){
+  if(spinning||hasDrawn)return;spinning=true;room.mode==='balloon'?popSound():crackSound();
+  try{const j=await fetch('/api/rooms/'+roomId+'/draw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player,slot,deviceId})}).then(r=>r.json());setTimeout(()=>{spinning=false;if(!j.ok){alert(j.message||'抽獎失敗');return;}hasDrawn=j.room.limitOnePerPlayer!==false;room=j.room;if(isLoseResult(j.result)){loseSound();$('result').innerHTML=`<div class="result-card lose-result stamp-result-card"><img src="/assets/lose-stamp.svg?v=110" alt="再接再厲"><div><b>${escapeHtml(player)}</b><p>這次先蓋上「再接再厲」印章 ✨</p></div></div>`;}else{winSound();$('result').innerHTML=`<div class="result-card win-result"><div class="result-confetti">🎉✨🎁</div><h2>恭喜 ${escapeHtml(player)}</h2><p>抽中</p><strong>${escapeHtml(j.result.prize)}</strong></div>`;}render();$('result').scrollIntoView({behavior:'smooth',block:'center'});},180);}
+  catch(e){spinning=false;alert('連線失敗，請再試一次');}
+}
+</script>
+</body>
+</html>
