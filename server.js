@@ -11,7 +11,8 @@ const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD || '8888';
 const rooms=new Map();
 const code=()=>Math.random().toString(36).slice(2,8).toUpperCase();
 const token=()=>crypto.randomBytes(18).toString('hex');
-function pub(r){return {id:r.id,title:r.title,mode:r.mode,count:r.count,note:r.note,limitOnePerPlayer:r.limitOnePerPlayer!==false,balloonShape:r.balloonShape,balloonFloat:r.balloonFloat,eggStyle:r.eggStyle,boardCols:[5,7,8].includes(+r.boardCols)?+r.boardCols:5,prizes:r.prizes.map(p=>({name:p.name,qty:p.qty,left:p.left,isLose:!!p.isLose})),results:r.results.map(x=>({slot:x.slot,prize:x.prize,isLose:!!x.isLose,player:x.player,time:x.time})),status:r.status};}
+function pub(r){return {id:r.id,title:r.title,mode:r.mode,count:r.count,note:r.note,limitOnePerPlayer:r.limitOnePerPlayer!==false,balloonShape:r.balloonShape,balloonFloat:r.balloonFloat,eggStyle:r.eggStyle,boardCols:[5,7,8].includes(+r.boardCols)?+r.boardCols:5,useScheduledStart:!!r.useScheduledStart,startAt:r.useScheduledStart&&r.startAt?r.startAt:null,serverNow:new Date().toISOString(),prizes:r.prizes.map(p=>({name:p.name,qty:p.qty,left:p.left,isLose:!!p.isLose})),results:r.results.map(x=>({slot:x.slot,prize:x.prize,isLose:!!x.isLose,player:x.player,time:x.time})),status:r.status};}
+function isBeforeScheduledStart(r){if(!r.useScheduledStart||!r.startAt)return false;const t=Date.parse(r.startAt);return Number.isFinite(t)&&Date.now()<t;}
 function emit(r){io.to(r.id).emit('room:update',pub(r));}
 function authRoom(req,res){const r=rooms.get(req.params.id.toUpperCase());if(!r||req.body.adminToken!==r.adminToken){res.status(403).json({ok:false,message:'主控驗證失敗'});return null;}return r;}
 function pickPrize(r){
@@ -24,6 +25,7 @@ function pickPrize(r){
 function adminReveal(r,slot){
   slot=parseInt(slot);
   if(r.status!=='open')return {ok:false,message:'抽獎已結束'};
+  if(isBeforeScheduledStart(r))return {ok:false,message:'尚未開放抽獎，請等倒數結束'};
   if(!slot||slot<1||slot>r.count)return {ok:false,message:'格子錯誤'};
   if(r.results.some(x=>x.slot===slot))return {ok:false,message:'這格已經開過了'};
   const picked=pickPrize(r); if(!picked)return {ok:false,message:'獎品已抽完'};
@@ -36,6 +38,7 @@ function claim(r,player,slot,deviceId=''){
   deviceId=String(deviceId||'').trim().slice(0,120);
   slot=parseInt(slot);
   if(r.status!=='open')return {ok:false,message:'抽獎已結束'};
+  if(isBeforeScheduledStart(r))return {ok:false,message:'尚未開放抽獎，請等倒數結束'};
   if(!player)return {ok:false,message:'請輸入遊戲名'};
   if(r.limitOnePerPlayer!==false){
     if(r.results.some(x=>x.player===player))return {ok:false,message:'這個遊戲名已經抽過囉'};
@@ -48,11 +51,11 @@ function claim(r,player,slot,deviceId=''){
   r.results.push(result); emit(r); return {ok:true,result,room:pub(r)};
 }
 
-app.get('/api/version',(req,res)=>res.json({ok:true,version:'1.1.3'}));
+app.get('/api/version',(req,res)=>res.json({ok:true,version:'1.1.6'}));
 app.post('/api/login',(req,res)=>res.json({ok:req.body.password===ADMIN_PASSWORD}));
 app.post('/api/rooms',(req,res)=>{
   let id=code();while(rooms.has(id))id=code();
-  const r={id,adminToken:token(),title:'歡樂抽獎活動',mode:'balloon',count:20,note:'',limitOnePerPlayer:true,balloonShape:'round',balloonFloat:true,eggStyle:'color',boardCols:5,prizes:[],results:[],status:'open',controller:null};
+  const r={id,adminToken:token(),title:'歡樂抽獎活動',mode:'balloon',count:20,note:'',limitOnePerPlayer:true,balloonShape:'round',balloonFloat:true,eggStyle:'color',boardCols:5,useScheduledStart:false,startAt:null,prizes:[],results:[],status:'open',controller:null};
   rooms.set(id,r);res.json({ok:true,id,adminToken:r.adminToken});
 });
 app.get('/api/rooms/:id',(req,res)=>{const r=rooms.get(req.params.id.toUpperCase());if(!r)return res.status(404).json({ok:false});res.json({ok:true,room:pub(r)});});
@@ -96,6 +99,12 @@ app.post('/api/rooms/:id/save',(req,res)=>{
   r.balloonFloat=req.body.balloonFloat!==false;
   r.eggStyle=req.body.eggStyle==='gold'?'gold':'color';
   r.boardCols=[5,7,8].includes(+req.body.boardCols)?+req.body.boardCols:5;
+  r.useScheduledStart=req.body.useScheduledStart===true;
+  if(r.useScheduledStart){
+    const startMs=Date.parse(String(req.body.startAt||''));
+    if(!Number.isFinite(startMs))return res.status(400).json({ok:false,message:'請完整設定開賽日期與時間'});
+    r.startAt=new Date(startMs).toISOString();
+  }else r.startAt=null;
 
   r.prizes=winPrizes.map(({name,qty})=>{
     const already=drawnWins.get(name)||0;
