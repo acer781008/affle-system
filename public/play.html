@@ -34,7 +34,7 @@
       <div id="noteBox" class="note player-note" style="display:none"></div>
       <div id="hint" class="player-hint"></div>
       <div class="player-board-tools">
-        <div class="board-size-control player-size-control" aria-label="盤面每排顯示數量"><span>盤面大小：</span><button type="button" data-cols="5" onclick="setPlayerBoardCols(5)">5格</button><button type="button" data-cols="7" onclick="setPlayerBoardCols(7)">7格</button><button type="button" data-cols="10" onclick="setPlayerBoardCols(10)">10格</button></div>
+        
         <button id="copyPlayerBoardBtn" class="btn player-copy-board" type="button" onclick="copyPlayerBoardImage()">🖼️ 複製整盤抽獎畫面</button>
       </div>
     </div>
@@ -53,14 +53,12 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const $=id=>document.getElementById(id),qs=new URLSearchParams(location.search),roomId=(qs.get('room')||'').toUpperCase(),socket=io();
-let room=null,player='',spinning=false,hasDrawn=false,audioCtx=null,lastResult=null;let playerBoardCols=[5,7,10].includes(+localStorage.getItem('rafflePlayerBoardCols'))?+localStorage.getItem('rafflePlayerBoardCols'):5;
+let room=null,player='',spinning=false,hasDrawn=false,audioCtx=null,lastResult=null;
 const DEVICE_KEY='raffleDeviceId';
 let deviceId=localStorage.getItem(DEVICE_KEY);
 if(!deviceId){deviceId=(crypto?.randomUUID?.()||('dev-'+Date.now()+'-'+Math.random().toString(36).slice(2)));localStorage.setItem(DEVICE_KEY,deviceId);}
 $('roomTag').textContent=roomId?'抽獎 '+roomId:'';
-function setPlayerBoardCols(n){n=[5,7,10].includes(+n)?+n:5;playerBoardCols=n;localStorage.setItem('rafflePlayerBoardCols',String(n));document.querySelectorAll('.player-size-control [data-cols]').forEach(b=>b.classList.toggle('active',+b.dataset.cols===n));if(room&&player)renderGrid();}
 
-setPlayerBoardCols(playerBoardCols);
 if(!roomId){$('msg').textContent='這個玩家網址缺少抽獎代碼，請重新向主控索取網址。';$('joinBtn').disabled=true;}else{socket.emit('room:join',roomId);loadRoom();}
 
 function assetFor(i=0){
@@ -68,6 +66,7 @@ function assetFor(i=0){
   if(room.mode==='balloon')return `/assets/balloon-${room.balloonShape||'round'}.png`;
   return `/assets/egg-${room.eggStyle==='gold'?'gold':'color'}-${String((i%(room.eggStyle==='gold'?8:16))+1).padStart(2,'0')}.png`;
 }
+function playerBoardCols(){return [5,7,10].includes(+room?.boardCols)?+room.boardCols:5;}
 function renderEntryArt(){
   if(!room)return;
   const srcs=room.mode==='balloon'?[assetFor(0),assetFor(0),assetFor(0)]:[assetFor(0),assetFor(1),assetFor(2)];
@@ -91,14 +90,14 @@ async function join(){
 }
 function render(){if(!room)return;$('gameTitle').textContent=room.title;$('noteBox').style.display=room.note?'block':'none';$('noteBox').textContent=room.note||'';renderGrid();}
 function renderGrid(){
+  const cols=playerBoardCols();
   $('hint').textContent=room.mode==='balloon'?'🎈 點一顆還沒被戳過的氣球':'🥚 點一顆還沒被砸過的金蛋';
   const used=new Map(room.results.map(x=>[x.slot,x]));
-  $('area').innerHTML='<div class="player-board-card"><div class="board clean-board mobile-board user-sized-board cols-'+playerBoardCols+'" style="--board-cols:'+playerBoardCols+'">'+Array.from({length:room.count},(_,i)=>{
+  $('area').innerHTML='<div class="player-board-card"><div class="board clean-board mobile-board user-sized-board cols-'+cols+'" style="--board-cols:'+cols+'">'+Array.from({length:room.count},(_,i)=>{
     const n=i+1,x=used.get(n),asset=assetFor(i),imgClass=`raffle-art ${room.mode==='egg'?'egg-art':''} ${room.mode==='balloon'&&room.balloonFloat&&!x?'float-art':''}`;
     const opened=x?'<div class="opened-mark">✓ 已抽</div>':'';
     return `<button class="tile clean-tile ${x?'used':''}" ${x||(room.limitOnePerPlayer!==false&&hasDrawn)?'disabled':''} aria-label="抽獎物件 ${n}" onclick="draw(${n})"><div class="object-card"><div class="art-wrap"><img class="${imgClass}" style="--delay:-${(i%11)*.13}s;--dur:${1.9+(i%8)*.19}s;--drift:${8+(i%5)*2}px" src="${asset}" alt=""></div>${opened}</div></button>`;
   }).join('')+'</div></div>';
-  document.querySelectorAll('.player-size-control [data-cols]').forEach(b=>b.classList.toggle('active',+b.dataset.cols===playerBoardCols));
 }
 function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
 function isLoseResult(x){return !!(x&&(x.isLose||/^(再接再厲|未中獎|沒中獎|謝謝惠顧|銘謝惠顧)$/u.test(String(x.prize||'').trim())));}
@@ -114,7 +113,7 @@ async function copyPlayerBoardImage(){
   const btn=$('copyPlayerBoardBtn'),oldText=btn.textContent;btn.disabled=true;btn.textContent='⏳ 產生整盤中…';
   let c=null,blob=null;
   try{
-    const cols=playerBoardCols,cellW=cols>=10?108:(cols>=7?124:145),cellH=cellW,gap=cols>=10?5:8,pad=24,header=122,rows=Math.ceil(room.count/cols);
+    const cols=playerBoardCols(),cellW=cols>=10?108:(cols>=7?124:145),cellH=cellW,gap=cols>=10?5:8,pad=24,header=122,rows=Math.ceil(room.count/cols);
     c=document.createElement('canvas');const g=c.getContext('2d');c.width=pad*2+cols*cellW+(cols-1)*gap;c.height=header+rows*cellH+(rows-1)*gap+pad;
     const bg=g.createLinearGradient(0,0,c.width,c.height);bg.addColorStop(0,'#fff5fb');bg.addColorStop(1,'#eef5ff');g.fillStyle=bg;g.fillRect(0,0,c.width,c.height);
     g.textAlign='center';g.fillStyle='#4b3b74';g.font='900 34px Segoe UI,Arial';g.fillText(room.title||'歡樂抽獎',c.width/2,43);g.font='800 19px Segoe UI,Arial';g.fillStyle='#735e9e';g.fillText(room.mode==='balloon'?'🎈 戳氣球':'🥚 砸金蛋',c.width/2,75);g.font='700 15px Segoe UI,Arial';g.fillStyle='#8a7da0';g.fillText(`已抽 ${room.results.length} / ${room.count}`,c.width/2,101);

@@ -316,3 +316,29 @@ body.admin-body::after,body.login-body::after,body.player-body::after{right:-30p
   .admin-body .admin-board.user-sized-board.cols-10 .admin-result-badge,.admin-body .admin-board.user-sized-board.cols-10 .lose-stamp-grid,.admin-body .admin-board.user-sized-board.cols-10 .grid-player-name{display:none!important}
   .admin-body .admin-board.user-sized-board.cols-10 .used:after{content:"✓";position:absolute;left:50%;bottom:2px;transform:translateX(-50%);z-index:10;font-size:10px;font-weight:1000;color:#755f86;background:#fff;border-radius:999px;padding:1px 4px}
 }
+
+
+/* V1.1.2：盤面每排數量只由主控設定，玩家統一同步；手機預設 5 格更緊湊 */
+.player-size-control{display:none!important}
+.player-board-tools{display:flex!important;justify-content:center!important}
+.player-board-tools .player-copy-board{width:auto}
+.player-body .user-sized-board .raffle-art{max-width:96%!important;object-fit:contain!important}
+.player-body .user-sized-board .egg-art{max-width:92%!important;object-fit:contain!important}
+@media(max-width:760px){
+  .player-board-tools{display:block!important}.player-board-tools .player-copy-board{width:100%}
+}
+@media(max-width:430px){
+  .player-body .user-sized-board.cols-5{gap:5px!important}
+  .player-body .user-sized-board.cols-5 .clean-tile{min-height:72px!important}
+  .player-body .user-sized-board.cols-5 .art-wrap{height:66px!important}
+  .player-body .user-sized-board.cols-5 .raffle-art{width:56px!important;height:56px!important}
+  .player-body .user-sized-board.cols-5 .egg-art{width:48px!important;height:59px!important}
+  .player-board-card{padding:6px!important}
+}
+@media(max-width:350px){
+  .player-body .user-sized-board.cols-5{gap:3px!important}
+  .player-body .user-sized-board.cols-5 .clean-tile{min-height:62px!important}
+  .player-body .user-sized-board.cols-5 .art-wrap{height:57px!important}
+  .player-body .user-sized-board.cols-5 .raffle-art{width:48px!important;height:48px!important}
+  .player-body .user-sized-board.cols-5 .egg-art{width:41px!important;height:51px!important}
+}
