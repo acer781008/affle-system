@@ -540,3 +540,85 @@ body.admin-body::after,body.login-body::after,body.player-body::after{right:-30p
   .player-body .user-sized-board.cols-8 .egg-art{width:30px!important;height:36px!important}
 }
 \n\n/* V1.1.6：選用預定開賽日期/時間＋玩家倒數 */\n.schedule-admin-box{margin-top:12px;padding:12px 13px;border:1px solid #e8def6;border-radius:16px;background:linear-gradient(145deg,#fffafd,#f7f6ff)}\n.schedule-toggle{margin:0!important}\n.schedule-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}\n.schedule-fields[hidden]{display:none!important}\n.schedule-fields label{display:grid;gap:6px;font-weight:800;color:#66537e}\n.schedule-admin-status{margin-top:9px;padding:9px 10px;border-radius:11px;background:#f5f2f9;color:#786d86;font-size:13px;font-weight:800;line-height:1.4}\n.schedule-admin-status.waiting{background:#fff7dd;color:#8a6a20}.schedule-admin-status.scheduled{background:#f0f0ff;color:#6151a0}.schedule-admin-status.open{background:#effbf1;color:#397348}\n.player-schedule-card{position:relative;z-index:3;margin:14px auto 0;max-width:430px;padding:13px 14px;border-radius:18px;background:linear-gradient(145deg,#fff8d8,#fff,#f4f0ff);border:1px solid #f0dfab;box-shadow:0 9px 22px #6c568018;text-align:center}\n.player-schedule-card[hidden]{display:none!important}.schedule-title{font-weight:1000;font-size:18px;color:#6a4f82}.schedule-start-at{margin-top:5px;font-size:13px;font-weight:800;color:#7c6b82}.schedule-countdown{margin-top:7px;font-size:30px;line-height:1.1;font-weight:1000;letter-spacing:1px;color:#e25e91;font-variant-numeric:tabular-nums}.schedule-sub{margin-top:5px;font-size:12px;font-weight:800;color:#92849a}\n.game-schedule{margin:10px auto 3px}.game-schedule .schedule-countdown{font-size:26px}\n.schedule-waiting-board{margin:14px auto 0;min-height:170px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:1px dashed #e1d5ef;border-radius:22px;background:linear-gradient(145deg,#ffffffb8,#f9f4ffb5);font-size:32px;color:#7b6498;text-align:center;padding:18px}.schedule-waiting-board b{font-size:20px}.schedule-waiting-board span{font-size:13px;font-weight:800;color:#9386a0}\n@media(max-width:520px){.schedule-fields{grid-template-columns:1fr}.schedule-countdown{font-size:27px}.player-schedule-card{padding:11px 10px;border-radius:15px}.schedule-waiting-board{min-height:145px;border-radius:17px}}\n
+
+/* =========================================================
+   V1.2.0 紅包雨整合版
+   ========================================================= */
+.mode-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.mode-grid .mode{min-width:0}
+.shared-prize-note{margin-top:12px;padding:11px 12px;border-radius:14px;background:linear-gradient(145deg,#effcf4,#f7fff9);border:1px solid #cdebd8;color:#407451;font-size:13px;font-weight:850;line-height:1.55}
+.rain-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:8px 0 12px}
+.rain-tab{border:2px solid #ead8cf;background:#fffaf4;color:#7a4d3e;border-radius:14px;padding:10px 8px;font-weight:900;cursor:pointer}
+.rain-tab.active{border-color:#ef5f56;background:linear-gradient(145deg,#fff0e7,#ffe4d8);color:#c83534;box-shadow:0 5px 13px #b53d3015}
+.rain-common-grid,.rain-setting-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.rain-common-grid label,.rain-setting-grid label{display:grid;gap:5px;font-size:13px;font-weight:850;color:#684f64}
+.rain-pane[hidden]{display:none!important}
+.rain-tip{margin-top:10px;padding:10px 11px;border-radius:13px;background:#fff6df;border:1px solid #f1dda9;color:#7e6439;font-size:12.5px;font-weight:800;line-height:1.55}
+.rain-admin-board{display:block!important;min-height:0!important;padding:0!important;background:transparent!important}
+.rain-admin-preview{display:flex;align-items:center;gap:18px;padding:22px;border-radius:22px;background:linear-gradient(145deg,#fff5ed,#fff,#edf8ff);border:1px solid #efd9c8;box-shadow:0 9px 24px #835a4512}
+.rain-preview-icon{flex:0 0 auto;width:92px;height:112px;border-radius:20px 20px 25px 25px;background:linear-gradient(145deg,#ff6d62,#e33a3d);border:5px solid #ffc95d;display:grid;place-items:center;font-size:48px;box-shadow:inset 0 3px 0 #ffffff4f,0 12px 23px #a73d3326}
+.rain-admin-preview h3{margin:0 0 5px;color:#c43a36}.rain-admin-preview p{margin:0;color:#70544a;font-weight:800;line-height:1.5}
+.rain-preview-stats{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.rain-preview-stats span{background:#fff;border:1px solid #eee1d6;border-radius:999px;padding:6px 9px;color:#75594d;font-size:12px;font-weight:850}.rain-preview-stats b{color:#d13b39}
+.rain-preview-note{margin-top:10px;color:#50715a;font-size:12px;font-weight:850}
+
+/* 玩家入口紅包裝飾 */
+.entry-redpacket{position:absolute;width:64px;height:78px;border-radius:14px 14px 19px 19px;background:linear-gradient(145deg,#ff7164,#e43f42 60%,#c92f38);border:4px solid #ffc856;display:grid;place-items:center;color:#bd292b;font-weight:1000;font-size:23px;box-shadow:0 9px 19px #8b3a3326;transform:rotate(-7deg)}
+.entry-redpacket:before{content:"";position:absolute;width:38px;height:38px;border-radius:50%;background:linear-gradient(#ffe98f,#ffc846);border:2px solid #fff0ad;z-index:0}
+.entry-redpacket{z-index:2}.entry-redpacket.er1{left:12%;top:21%;transform:rotate(-10deg)}.entry-redpacket.er2{left:50%;top:7%;transform:translateX(-50%) rotate(4deg);width:72px;height:88px}.entry-redpacket.er3{right:11%;top:24%;transform:rotate(11deg)}
+.entry-redpacket{font-size:0}.entry-redpacket:after{content:"福";position:relative;z-index:2;font-size:22px}
+
+/* 紅包雨首頁 */
+.rain-start-card{max-width:560px;margin:14px auto;padding:20px;border-radius:25px;background:linear-gradient(145deg,#fff9ef,#fff,#eef8ff);border:2px solid #fff;box-shadow:0 14px 35px #735b6817}
+.rain-start-hero{display:flex;align-items:center;justify-content:center;gap:15px;text-align:left}.rain-start-hero h2{margin:2px 0;color:#d63d39;font-size:26px}.rain-small-title{font-weight:900;color:#8d6657}
+.rain-mascot-packet{width:74px;height:91px;border-radius:16px 16px 22px 22px;background:linear-gradient(145deg,#ff7165,#df373e);border:5px solid #ffc955;display:grid;place-items:center;color:#b7282b;font-size:23px;font-weight:1000;position:relative;box-shadow:0 10px 21px #8c393027}
+.rain-mascot-packet:before{content:"";position:absolute;width:42px;height:42px;border-radius:50%;background:linear-gradient(#fff0a7,#ffc849);border:2px solid #fff5c9}.rain-mascot-packet{font-size:0}.rain-mascot-packet:after{content:"福";position:relative;font-size:22px}
+.rain-rule-box{margin-top:16px;padding:14px;border-radius:17px;background:#fff3dc;border:1px solid #f0dab1;color:#755545;font-weight:800;line-height:1.65;text-align:center}
+.rain-rule-box b{color:#cf3737}.rain-player-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.rain-player-stats span{background:#fff;border:1px solid #eee0d7;border-radius:13px;padding:9px;text-align:center;font-size:13px;font-weight:850;color:#71584d}.rain-player-stats b{color:#d53b3a}
+.rain-home-message{margin-top:10px;padding:9px;border-radius:12px;background:#fff0f0;color:#af4141;text-align:center;font-weight:850;font-size:13px}
+.rain-start-button{width:100%;margin-top:13px;font-size:17px}
+
+/* 紅包雨遊戲 */
+.rain-game-wrap{position:relative;max-width:680px;margin:8px auto 25px;border-radius:25px;overflow:hidden;background:#86d2ff;box-shadow:0 16px 40px #526e8426;border:2px solid #fff}
+.rain-hud{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;position:relative;z-index:20;padding:8px;background:linear-gradient(180deg,#ffffffed,#fff8e9e8)}
+.rain-hud>div{text-align:center;padding:6px 4px;border-radius:13px;background:#fff;border:1px solid #f0e1d3}.rain-hud span{display:block;font-size:10px;font-weight:800;color:#8a7165}.rain-hud b{display:block;margin-top:2px;color:#cf3937;font-size:18px}
+.rain-arena{height:min(64vh,590px);min-height:430px;position:relative;overflow:hidden;background:linear-gradient(180deg,#6fc9ff 0%,#a9e2ff 57%,#e8f8ff 77%,#fff0d8 100%);touch-action:none}
+.rain-cloud{position:absolute;background:#fffffff0;border-radius:999px;opacity:.88}.rain-cloud:before,.rain-cloud:after{content:"";position:absolute;background:inherit;border-radius:50%}.rc1{width:130px;height:36px;left:-35px;top:16%}.rc1:before{width:62px;height:62px;left:28px;top:-32px}.rc1:after{width:50px;height:50px;right:15px;top:-24px}.rc2{width:145px;height:40px;right:-40px;top:27%}.rc2:before{width:68px;height:68px;left:25px;top:-35px}.rc2:after{width:52px;height:52px;right:20px;top:-25px}
+.rain-center{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);z-index:15;text-align:center;color:#d83b38;text-shadow:0 3px 0 #fff;transition:.25s}.rain-center b{display:block;font-size:70px;line-height:1}.rain-center span{display:block;font-size:22px;font-weight:1000}.rain-center.fade{opacity:0;transform:translate(-50%,-56%) scale(.8);pointer-events:none}
+.falling-redpacket{position:absolute;top:-105px;width:64px;height:80px;border:0;background:transparent;padding:0;z-index:8;filter:drop-shadow(0 7px 6px #7c332e3a);animation:rainFall linear forwards;touch-action:manipulation}
+.falling-redpacket i{position:absolute;inset:3px 5px;border-radius:14px 14px 19px 19px;background:linear-gradient(145deg,#ff7064,#ec4444 52%,#c72c35);border:3px solid #ffc757;box-shadow:inset 0 2px 0 #ffffff55}
+.falling-redpacket i:before{content:"";position:absolute;left:50%;top:49%;transform:translate(-50%,-50%);width:35px;height:35px;border-radius:50%;background:linear-gradient(#ffe995,#ffc444);border:2px solid #fff0b0}
+.falling-redpacket i span{position:absolute;z-index:2;left:50%;top:49%;transform:translate(-50%,-50%);font-style:normal;font-weight:1000;color:#b92a2c;font-size:19px}
+.falling-redpacket.gold i,.falling-redpacket.bonus i{background:linear-gradient(145deg,#ffbd46,#f5832a 55%,#d44a20);border-color:#ffe58c}.falling-redpacket.penalty i{background:linear-gradient(145deg,#aa8bbd,#795a91 58%,#57406c);border-color:#d8c2e5}.falling-redpacket.penalty i:before{background:linear-gradient(#e9dcf0,#c7abd6)}.falling-redpacket.penalty i span{color:#624574}
+.falling-redpacket.tapped{pointer-events:none;animation:none!important}.falling-redpacket.tapped i{animation:rainPacketPop .26s ease-out forwards}
+@keyframes rainFall{from{transform:translate3d(0,-20px,0) rotate(var(--r0))}to{transform:translate3d(var(--drift),calc(64vh + 760px),0) rotate(var(--r1))}}
+@keyframes rainPacketPop{0%{transform:scale(1);opacity:1}65%{transform:scale(1.38) rotate(10deg);opacity:1}100%{transform:scale(.25);opacity:0}}
+.rain-float-score{position:absolute;z-index:18;transform:translate(-50%,-50%);font-size:25px;font-weight:1000;text-shadow:0 2px 7px #603c3a45;animation:rainScoreFloat .75s ease-out forwards;pointer-events:none}.rain-float-score.positive{color:#fff189}.rain-float-score.negative{color:#7f315d}
+@keyframes rainScoreFloat{to{transform:translate(-50%,-105px) scale(1.13);opacity:0}}
+.rain-progress-box{padding:11px 13px;background:#fffaf1}.rain-progress-row{display:flex;justify-content:space-between;align-items:center;font-weight:850;color:#74574a}.rain-progress-row b{color:#d33837}.rain-progress-track{height:14px;border-radius:999px;background:#eadfd8;overflow:hidden;margin-top:7px}.rain-progress-track i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ff8174,#e93f42);border-radius:999px;transition:width .16s}
+.rain-qualified{position:absolute;z-index:30;left:50%;top:48%;transform:translate(-50%,-50%);width:min(88%,390px);padding:18px;border-radius:24px;background:#fffaf1f5;border:4px solid #fff;box-shadow:0 18px 45px #78433e36;text-align:center}.rq-icon{font-size:51px}.rain-qualified h2{margin:2px 0;color:#d23837}.rain-qualified p{margin:5px 0 10px;color:#795749;font-weight:850}
+.rain-reel{height:65px;display:grid;place-items:center;margin:10px 0;border-radius:17px;background:linear-gradient(#fff7d8,#ffe4a5);border:3px solid #eebc4b;color:#a83426;font-weight:1000;font-size:22px;overflow:hidden}.rain-draw-btn{width:100%;background:linear-gradient(#ffe68b,#ffc345);color:#842c1d;font-size:17px}
+.rain-spark{position:absolute;z-index:40;color:#fff18a;font-size:20px;text-shadow:0 0 10px #ffd949;pointer-events:none;animation:rainSpark .9s ease-out forwards}@keyframes rainSpark{to{transform:translate(var(--sx),var(--sy)) scale(1.5);opacity:0}}
+.rain-mini-result{position:absolute;z-index:31;left:50%;top:47%;transform:translate(-50%,-50%);padding:14px 17px;border-radius:17px;background:#fff;border:3px solid #ffd263;box-shadow:0 13px 34px #67463d33;font-size:18px;font-weight:1000;color:#ae3a31}.rain-mini-result.lose{color:#75506d;border-color:#d8bfdc}
+.rain-end-card{max-width:520px;margin:15px auto;padding:25px 18px;border-radius:24px;background:linear-gradient(145deg,#fff8ed,#fff,#f0f8ff);border:2px solid #fff;box-shadow:0 13px 32px #604e5a16;text-align:center}.rain-end-icon{font-size:56px}.rain-end-card h2{margin:4px 0;color:#cc3b38}.rain-end-card p{font-weight:850;color:#71584e}.rain-end-card .btn{margin-top:10px}.rain-done-note{margin-top:12px;padding:10px;border-radius:13px;background:#f2f0f7;color:#756d82;font-size:13px;font-weight:850}
+
+@media(max-width:700px){
+  .mode-grid{grid-template-columns:repeat(3,1fr)}
+  .mode-grid .mode{padding:10px 5px}.mode-grid .mode .emoji{font-size:29px}
+  .rain-common-grid,.rain-setting-grid{grid-template-columns:1fr 1fr}
+  .rain-admin-preview{align-items:flex-start}
+}
+@media(max-width:480px){
+  .rain-tabs{grid-template-columns:1fr;gap:5px}
+  .rain-tab{padding:8px}
+  .rain-common-grid,.rain-setting-grid{grid-template-columns:1fr 1fr;gap:7px}
+  .rain-admin-preview{display:block;text-align:center}.rain-preview-icon{margin:0 auto 12px;width:76px;height:92px}
+  .rain-game-wrap{margin-left:-5px;margin-right:-5px;border-radius:20px}
+  .rain-arena{height:62vh;min-height:410px}
+  .falling-redpacket{width:58px;height:73px}.falling-redpacket i:before{width:31px;height:31px}.falling-redpacket i span{font-size:17px}
+  .rain-hud b{font-size:16px}.rain-hud span{font-size:9px}
+  .rain-qualified{width:91%;padding:15px}
+}
+@media(max-width:360px){
+  .mode-grid{gap:5px}.mode-grid .mode b{font-size:12px}
+  .rain-common-grid,.rain-setting-grid{grid-template-columns:1fr}
+}
