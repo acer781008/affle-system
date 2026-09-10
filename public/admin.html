@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="stylesheet" href="style.css">
-<title>歡樂抽獎主控 V1.2.0</title>
+<title>歡樂抽獎主控 V1.2.3</title>
 </head>
 <body class="admin-body">
-<div class="top"><div class="brand">🎪 歡樂抽獎系統｜主控 <small>V1.2.0</small></div><div id="controlState">尚未產生抽獎</div></div>
+<div class="top"><div class="brand">🎪 歡樂抽獎系統｜主控 <small>V1.2.3</small></div><div id="controlState">尚未產生抽獎</div></div>
 <div class="wrap">
   <div class="grid2">
     <section class="card">
@@ -52,7 +52,7 @@
           </div>
 
           <div class="rain-common-grid">
-            <label><span>紅包速度</span><select id="rainSpeed" class="input"><option value="normal">普通</option><option value="fast" selected>快</option><option value="turbo">超快</option></select></label>
+            <label><span>紅包速度</span><select id="rainSpeed" class="input"><option value="normal">普通</option><option value="fast" selected>快</option><option value="turbo">超快</option><option value="ultra">極快</option></select></label>
             <label><span>紅包密度</span><select id="rainDensity" class="input"><option value="normal">普通</option><option value="high" selected>多</option><option value="max">超多</option></select></label>
             <label><span>音效</span><select id="rainSound" class="input"><option value="true" selected>開</option><option value="false">關</option></select></label>
             <label><span>每人最多獲獎</span><select id="rainMaxWins" class="input"><option>1</option><option>2</option><option>3</option><option>5</option></select></label>
@@ -88,6 +88,9 @@
         </div>
       </div>
 
+      <details class="admin-extra-settings">
+        <summary>⚙️ 其他設定｜數量・限制・開賽時間・備註</summary>
+        <div class="admin-extra-inner">
       <div id="countLabel" class="label">物件數量（主控自己填）</div>
       <input id="count" class="input" type="number" min="1" max="500" value="20">
       <div id="countHelp" class="muted">例如 20、57、100、155；手機會自然換行往下滑，不會把圖案硬縮小。</div>
@@ -104,6 +107,8 @@
       </div>
 
       <div class="label">📝 備註（自填）</div><textarea id="note" class="input" rows="4" placeholder="例如：每人限抽一次、中獎請截圖…"></textarea>
+        </div>
+      </details>
     </section>
 
     <section class="card">
@@ -121,7 +126,8 @@
 
   <section class="card" style="margin-top:18px">
     <div class="share-title-row"><h2>🔗 玩家分享</h2><div id="drawCodeBadge" class="draw-code-badge" style="display:none"></div></div>
-    <div class="row"><input id="playerUrl" class="input" style="flex:1;min-width:220px" readonly placeholder="產生新抽獎後顯示玩家網址"><button class="btn" onclick="copyUrl()">🔗 複製網址</button><button class="btn" onclick="openPlayer()">👤 開啟玩家頁</button><button class="btn" onclick="copyShare()">📋 複製分享文字</button></div>
+    <input id="playerUrl" type="hidden">
+    <div class="row share-button-only"><button class="btn" onclick="copyUrl()">🔗 複製玩家網址</button><button class="btn" onclick="openPlayer()">👤 開啟玩家頁</button><button class="btn" onclick="copyShare()">📋 複製分享文字</button></div>
     <div class="row" style="margin-top:12px"><button class="btn" onclick="copyList()">📋 複製抽獎名單</button><button id="shareBoardBtn" class="btn" onclick="copyBoardImage()">🖼️ 複製整盤抽獎畫面</button><button class="btn danger" onclick="deleteRoom()">🗑️ 刪除抽獎</button></div>
   </section>
 
@@ -201,6 +207,10 @@ function syncOptionPanels(){
   document.querySelectorAll('.egg-pick').forEach(x=>x.classList.toggle('active',x.dataset.egg===eggStyle));
   syncRainTabs();
   const rain=mode==='rain';
+  const oneDraw=document.querySelector('.one-draw-toggle');if(oneDraw)oneDraw.style.display=rain?'none':'flex';
+  let rn=document.getElementById('rainLimitNote');
+  if(rain&&!rn){rn=document.createElement('div');rn.id='rainLimitNote';rn.className='rain-tip';rn.textContent='🧧 紅包雨依「每人可玩次數」與「每人最多獲獎數」控制，不套用上方每人限抽一次。';document.querySelector('.admin-extra-inner')?.prepend(rn);}
+  if(rn)rn.style.display=rain?'block':'none';
   $('countLabel').textContent=rain?'抽獎池總份數（用來計算「再接再厲」數量）':'物件數量（主控自己填）';
   $('countHelp').textContent=rain?'例如總份數 20，設定有獎共 8 份，其餘 12 份會自動成為「再接再厲」。A／B／C 都從這同一池隨機抽。':'例如 20、57、100、155；手機會自然換行往下滑，不會把圖案硬縮小。';
   $('prizeHelp').textContent=rain?'只設定真正有獎的獎項；「抽獎池總份數－有獎數量」會自動補成再接再厲。':'只要設定真正有獎的獎品。剩下格數會由系統自動補成「再接再厲」。';
@@ -260,7 +270,7 @@ function setAdminBoardCols(n,silent=false){n=[5,7,8].includes(+n)?+n:5;adminBoar
 function assetFor(p,i){if(p.mode==='balloon')return `/assets/balloon-${p.balloonShape||'round'}.png`;return `/assets/egg-${p.eggStyle==='gold'?'gold':'color'}-${String((i%(p.eggStyle==='gold'?8:16))+1).padStart(2,'0')}.png`;}
 function renderRainAdminPreview(p){
   const rs=p.rain||rainSettings(),t=prizeTotals(),sub=rs.subMode,mc=rs[sub];
-  const rule=sub==='A'?`${mc.duration} 秒內搶滿 ${mc.targetPackets} 包 → 立即抽獎`:sub==='B'?`每局可搶 ${$('limitOnePerPlayer').checked?1:mc.packetLimit} 包 → 點到直接開獎`:`${mc.duration} 秒內累積 ${mc.targetScore} 分（${{easy:'簡單',normal:'普通',hard:'困難'}[mc.difficulty]}）→ 立即抽獎`;
+  const rule=sub==='A'?`${mc.duration} 秒內搶滿 ${mc.targetPackets} 包 → 立即抽獎`:sub==='B'?`每局可搶 ${mc.packetLimit} 包 → 點到直接開獎`:`${mc.duration} 秒內累積 ${mc.targetScore} 分（${{easy:'簡單',normal:'普通',hard:'困難'}[mc.difficulty]}）→ 立即抽獎`;
   $('adminBoard').className='admin-board rain-admin-board';
   $('adminBoard').innerHTML=`<div class="rain-admin-preview"><div class="rain-preview-icon">🧧</div><div><h3>${modeLabel()}</h3><p>${rule}</p><div class="rain-preview-stats"><span>抽獎池 <b>${t.count}</b> 份</span><span>有獎 <b>${t.win}</b></span><span>再接再厲 <b>${Math.max(0,t.lose)}</b></span><span>已開獎 <b>${(p.results||[]).length}</b></span></div><div class="rain-preview-note">A／B／C 最後開獎都直接使用上方同一份獎項設定與剩餘庫存。</div></div></div>`;
 }
@@ -309,7 +319,7 @@ function copyUrl(){const u=$('playerUrl').value;if(!u)return toastMsg('請先產
 function openPlayer(){const u=$('playerUrl').value;if(!u)return toastMsg('請先產生新抽獎');window.open(u,'_blank');}
 function copyShare(){
   if(!roomId)return toastMsg('請先產生新抽獎');if(!validateSchedule())return;
-  const t=$('title').value,n=$('note').value.trim(),u=$('playerUrl').value,limit=$('limitOnePerPlayer').checked?'👤 每位玩家最終抽獎限一次\n':'',schedule=$('useScheduledStart').checked?`📅 開賽時間：${scheduleDisplayText()}\n`:'';
+  const t=$('title').value,n=$('note').value.trim(),u=$('playerUrl').value,limit=mode!=='rain'&&$('limitOnePerPlayer').checked?'👤 每位玩家最終抽獎限一次\n':'',schedule=$('useScheduledStart').checked?`📅 開賽時間：${scheduleDisplayText()}\n`:'';
   let how='';
   if(mode==='balloon')how='🎯 選擇一顆氣球進行抽獎';
   else if(mode==='egg')how='🎯 選擇一顆金蛋進行抽獎';
