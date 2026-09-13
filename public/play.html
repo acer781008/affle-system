@@ -131,7 +131,7 @@ async function loadRoom(){
 socket.on('room:update',r=>{
   room=r;syncServerClock(room);
   if(!player){$('joinTitle').textContent=room.title;renderEntryArt();}
-  else if(room.mode==='rain'&&(rainState.playing||rainState.qualified||rainState.drawing||rainState.requesting)){updateRainHud();}
+  else if(room.mode==='rain'&&(rainState.starting||rainState.playing||rainState.qualified||rainState.drawing||rainState.requesting)){updateRainHud();}
   else if(room.mode==='random'||!spinning)render();
   updateScheduleUI();
 });
