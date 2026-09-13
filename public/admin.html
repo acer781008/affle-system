@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="stylesheet" href="style.css">
-<title>歡樂抽獎主控 V1.2.7</title>
+<title>歡樂抽獎主控 V1.3.1</title>
 </head>
 <body class="admin-body">
-<div class="top"><div class="brand">🎪 歡樂抽獎系統｜主控 <small>V1.2.7</small></div><div id="controlState">尚未產生抽獎</div></div>
+<div class="top"><div class="brand">🎪 歡樂抽獎系統｜主控 <small>V1.3.1</small></div><div class="top-right-status"><div id="serverClock" class="server-clock">伺服器時間 --/-- --:--:--</div><div id="controlState">尚未產生抽獎</div></div></div>
 <div class="wrap">
   <div class="grid2">
     <section class="card">
@@ -19,6 +19,7 @@
         <div class="mode active" data-mode="balloon" onclick="choose(this)"><div class="emoji">🎈</div><b>戳氣球</b></div>
         <div class="mode" data-mode="egg" onclick="choose(this)"><div class="emoji">🥚</div><b>砸金蛋</b></div>
         <div class="mode" data-mode="rain" onclick="choose(this)"><div class="emoji">🧧</div><b>紅包雨</b></div>
+        <div class="mode" data-mode="random" onclick="choose(this)"><div class="emoji">🎲</div><b>系統隨機抽取</b></div>
       </div>
 
       <div class="style-box">
@@ -55,7 +56,7 @@
             <label><span>紅包速度</span><select id="rainSpeed" class="input"><option value="normal">普通</option><option value="fast" selected>快</option><option value="turbo">超快</option><option value="ultra">極快</option></select></label>
             <label><span>紅包密度</span><select id="rainDensity" class="input"><option value="normal">普通</option><option value="high" selected>多</option><option value="max">超多</option></select></label>
             <label><span>音效</span><select id="rainSound" class="input"><option value="true" selected>開</option><option value="false">關</option></select></label>
-            <label><span>每人最多開獎次數（含再接再厲）</span><select id="rainMaxWins" class="input"><option>1</option><option>2</option><option>3</option><option>5</option></select></label>
+            <label><span>每人最多獲獎</span><select id="rainMaxWins" class="input"><option>1</option><option>2</option><option>3</option><option>5</option></select></label>
           </div>
 
           <div id="rainPaneA" class="rain-pane">
@@ -85,6 +86,21 @@
             </div>
             <div class="rain-tip">紅包會加分或扣分，最低 0 分。達標後與 A 一樣：按「立即抽獎」→ 獎項名稱輪播 → 停獎。扣分比例與幅度由系統依難度自動控制。</div>
           </div>
+        </div>
+
+        <div id="randomOptions" style="display:none">
+          <div class="label">🎲 系統隨機抽取</div>
+          <div class="random-settings-grid">
+            <label><span>每人最多獲獎</span>
+              <select id="randomMaxWins" class="input">
+                <option value="1" selected>1 次</option><option value="2">2 次</option><option value="3">3 次</option><option value="5">5 次</option><option value="9999">不限制</option>
+              </select>
+            </label>
+            <div class="random-name-count">待抽名單：<b id="randomNameCount">0</b> 人</div>
+          </div>
+          <div class="label">👥 待抽名單（每行一位）</div>
+          <textarea id="randomNames" class="input random-names-input" rows="10" placeholder="小明&#10;Amy&#10;Kevin"></textarea>
+          <div class="rain-tip">會自動移除空白與重複名字。單一抽獎可指定目前獎品；「一次全部抽完」會依上方獎品順序完成抽取。</div>
         </div>
       </div>
 
@@ -118,7 +134,7 @@
       <button class="btn" onclick="addPrize()">＋ 新增一個獎品</button>
       <div id="prizeSummary" class="prize-summary"><b>總格數 20</b><span>有獎 8</span><span>再接再厲 12</span></div>
       <p id="prizeHelp" class="muted">只要設定真正有獎的獎品。剩下格數會由系統自動補成「再接再厲」。</p>
-      <div class="shared-prize-note">✅ 戳氣球、砸金蛋、紅包雨 A／B／C 都共用這一份獎品設定，不會另外建立紅包雨獎品池。</div>
+      <div class="shared-prize-note">✅ 戳氣球、砸金蛋、紅包雨 A／B／C、系統隨機抽取都使用這一區設定獎品。</div>
       <div class="row" style="margin-top:18px"><button id="createBtn" class="btn primary" onclick="createRoom()">🔄 產生新抽獎</button><button class="btn pink" onclick="save()">💾 儲存並開放抽獎</button><button class="btn danger" onclick="endRoom()">⏹ 結束抽獎</button></div>
       <div id="newDrawStatus" class="new-draw-status idle"><b>尚未產生新抽獎</b><br><span>設定可以先調整，下方會立即預覽。</span></div>
     </section>
@@ -155,8 +171,35 @@
 if(!sessionStorage.admin) location='admin-login.html';
 const $=id=>document.getElementById(id);
 let mode='balloon',balloonShape='round',eggStyle='color',rainSubMode='A';
+let serverOffsetMs=0,serverClockTimer=null,lastRandomBatch=[];
 let roomId='',adminToken='',room=null,control='control',adminRevealMode=false,audioCtx=null,adminBoardCols=5;
 const socket=io();
+
+async function syncClockFromServer(){
+  try{
+    const j=await fetch('/api/time',{cache:'no-store'}).then(r=>r.json());
+    if(j?.serverNow){const t=Date.parse(j.serverNow);if(Number.isFinite(t))serverOffsetMs=t-Date.now();}
+  }catch(e){}
+  updateServerClock();
+}
+function serverNowMs(){return Date.now()+serverOffsetMs;}
+function fmtServerDateTime(ms=serverNowMs()){
+  return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(ms));
+}
+function updateServerClock(){if($('serverClock'))$('serverClock').textContent='伺服器時間 '+fmtServerDateTime();}
+syncClockFromServer();setInterval(updateServerClock,1000);setInterval(syncClockFromServer,300000);
+function randomNamesData(){
+  const raw=($('randomNames')?.value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean),seen=new Set(),out=[];
+  for(const n of raw){const k=n.toLocaleLowerCase('zh-TW');if(seen.has(k))continue;seen.add(k);out.push(n);}
+  return out;
+}
+function updateRandomNameCount(){if($('randomNameCount'))$('randomNameCount').textContent=randomNamesData().length;}
+function randomSettings(){return {maxWins:+($('randomMaxWins')?.value||1),names:randomNamesData()};}
+function restoreRandomControls(r){
+  const x=r?.random||{};$('randomMaxWins').value=String(x.maxWins||1);
+  if(Array.isArray(x.names))$('randomNames').value=x.names.join('\n');
+  updateRandomNameCount();
+}
 
 function clampCount(){return Math.max(1,Math.min(500,parseInt($('count').value)||1));}
 function localDateParts(d){const pad=n=>String(n).padStart(2,'0');return {date:`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`,time:`${pad(d.getHours())}:${pad(d.getMinutes())}`};}
@@ -196,37 +239,41 @@ function syncRainTabs(){
 function modeLabel(){
   if(mode==='balloon')return '🎈 戳氣球';
   if(mode==='egg')return '🥚 砸金蛋';
+  if(mode==='random')return '🎲 系統隨機抽取';
   return `🧧 紅包雨 ${rainSubMode}｜${rainSubMode==='A'?'集滿型':rainSubMode==='B'?'單包開獎':'分數累積型'}`;
 }
 function syncOptionPanels(){
   $('balloonOptions').style.display=mode==='balloon'?'block':'none';
   $('eggOptions').style.display=mode==='egg'?'block':'none';
   $('rainOptions').style.display=mode==='rain'?'block':'none';
+  $('randomOptions').style.display=mode==='random'?'block':'none';
   document.querySelectorAll('.mode').forEach(x=>x.classList.toggle('active',x.dataset.mode===mode));
   document.querySelectorAll('.shape-pick').forEach(x=>x.classList.toggle('active',x.dataset.shape===balloonShape));
   document.querySelectorAll('.egg-pick').forEach(x=>x.classList.toggle('active',x.dataset.egg===eggStyle));
   syncRainTabs();
-  const rain=mode==='rain';
-  const oneDraw=document.querySelector('.one-draw-toggle');if(oneDraw)oneDraw.style.display=rain?'none':'flex';
+  const rain=mode==='rain',random=mode==='random';
+  const oneDraw=document.querySelector('.one-draw-toggle');if(oneDraw)oneDraw.style.display=(rain||random)?'none':'flex';
   let rn=document.getElementById('rainLimitNote');
-  if(rain&&!rn){rn=document.createElement('div');rn.id='rainLimitNote';rn.className='rain-tip';rn.textContent='🧧 紅包雨：「每人可玩次數」控制能挑戰幾局；「每人最多開獎次數」控制能拿幾次抽獎結果，包含「再接再厲」。';document.querySelector('.admin-extra-inner')?.prepend(rn);}
+  if(rain&&!rn){rn=document.createElement('div');rn.id='rainLimitNote';rn.className='rain-tip';rn.textContent='🧧 紅包雨依「每人可玩次數」與「每人最多獲獎數」控制，不套用上方每人限抽一次。';document.querySelector('.admin-extra-inner')?.prepend(rn);}
   if(rn)rn.style.display=rain?'block':'none';
-  $('countLabel').textContent=rain?'抽獎池總份數（用來計算「再接再厲」數量）':'物件數量（主控自己填）';
-  $('countHelp').textContent=rain?'例如總份數 20，設定有獎共 8 份，其餘 12 份會自動成為「再接再厲」。A／B／C 都從這同一池隨機抽。':'例如 20、57、100、155；手機會自然換行往下滑，不會把圖案硬縮小。';
-  $('prizeHelp').textContent=rain?'只設定真正有獎的獎項；「抽獎池總份數－有獎數量」會自動補成再接再厲。':'只要設定真正有獎的獎品。剩下格數會由系統自動補成「再接再厲」。';
+  $('countLabel').textContent=random?'獎品總名額（由獎品數量自動計算）':rain?'抽獎池總份數（用來計算「再接再厲」數量）':'物件數量（主控自己填）';
+  $('count').closest('.admin-extra-inner')&&($('count').style.display=random?'none':'block');
+  $('countHelp').textContent=random?'系統隨機抽取不需要設定格數，總抽取名額直接由右側獎品數量決定。':rain?'例如總份數 20，設定有獎共 8 份，其餘 12 份會自動成為「再接再厲」。A／B／C 都從這同一池隨機抽。':'例如 20、57、100、155；手機會自然換行往下滑，不會把圖案硬縮小。';
+  $('prizeHelp').textContent=random?'每個獎品的數量，就是這個獎要抽出的得獎人數。':rain?'只設定真正有獎的獎項；「抽獎池總份數－有獎數量」會自動補成再接再厲。':'只要設定真正有獎的獎品。剩下格數會由系統自動補成「再接再厲」。';
   $('limitText').textContent=rain?'👤 每位玩家最終開獎限一次':'👤 每位玩家限抽一次';
-  $('boardControls').style.display=rain?'none':'flex';
-  $('shareBoardBtn').style.display=rain?'none':'inline-flex';
-  $('drawnLabel').textContent=rain?'已開獎':'已抽';
-  $('leftLabel').textContent=rain?'剩餘份數':'剩餘格數';
-  $('recordNoHead').textContent=rain?'次':'格';
-  $('adminBoardHint').textContent=rain?'紅包掉落動畫只在玩家手機本機執行；主控只同步開獎結果與庫存，降低伺服器壓力。':'玩家抽獎會即時同步；「每排 5／7／8 格」由主控統一設定，玩家不能自行修改。';
+  $('boardControls').style.display=(rain||random)?'none':'flex';
+  $('shareBoardBtn').style.display=(rain||random)?'none':'inline-flex';
+  $('drawnLabel').textContent=random?'已抽出':rain?'已開獎':'已抽';
+  $('leftLabel').textContent=random?'剩餘名額':rain?'剩餘份數':'剩餘格數';
+  $('recordNoHead').textContent=(rain||random)?'次':'格';
+  $('adminBoardHint').textContent=random?'由主控進行單一抽獎或一次全部抽完；結果會即時同步到玩家觀看頁。':rain?'紅包掉落動畫只在玩家手機本機執行；主控只同步開獎結果與庫存，降低伺服器壓力。':'玩家抽獎會即時同步；「每排 5／7／8 格」由主控統一設定，玩家不能自行修改。';
   updatePrizeSummary();
 }
 function choose(el){mode=el.dataset.mode;adminRevealMode=false;syncOptionPanels();renderAdminBoard();}
 document.querySelectorAll('.shape-pick').forEach(b=>b.addEventListener('click',()=>{balloonShape=b.dataset.shape;syncOptionPanels();renderAdminBoard();toastMsg('已切換：'+b.textContent.trim(),900);}));
 document.querySelectorAll('.egg-pick').forEach(b=>b.addEventListener('click',()=>{eggStyle=b.dataset.egg;syncOptionPanels();renderAdminBoard();toastMsg('已切換：'+b.textContent.trim(),900);}));
 ['rainSpeed','rainDensity','rainSound','rainMaxWins','rainADuration','rainATarget','rainAPlays','rainBDuration','rainBLimit','rainBPlays','rainCDuration','rainCTarget','rainDifficulty','rainCPlays'].forEach(id=>$(id).addEventListener('change',renderAdminBoard));
+$('randomNames').addEventListener('input',()=>{updateRandomNameCount();renderAdminBoard();});$('randomMaxWins').addEventListener('change',renderAdminBoard);
 $('balloonFloat').addEventListener('change',()=>{renderAdminBoard();toastMsg($('balloonFloat').checked?'飄動效果：開啟':'飄動效果：關閉',900);});
 $('count').addEventListener('input',()=>{updatePrizeSummary();renderAdminBoard();});
 $('useScheduledStart').addEventListener('change',updateScheduleFields);$('startDate').addEventListener('change',updateScheduleFields);$('startTime').addEventListener('change',updateScheduleFields);
@@ -234,16 +281,16 @@ $('useScheduledStart').addEventListener('change',updateScheduleFields);$('startD
 function addPrize(n='',q=1){const d=document.createElement('div');d.className='prize-row formal-prize-row';d.innerHTML=`<input class="input pname" placeholder="獎品名稱"><input class="input pqty" type="number" min="1" value="${q}"><button class="btn danger" type="button">×</button>`;d.querySelector('.pname').value=n;d.querySelector('.btn').onclick=()=>{d.remove();updatePrizeSummary();renderAdminBoard();};d.querySelectorAll('input').forEach(el=>el.addEventListener('input',()=>{updatePrizeSummary();renderAdminBoard();}));$('prizes').appendChild(d);updatePrizeSummary();}
 addPrize('直升券',1);addPrize('100元禮券',2);addPrize('小禮物',5);
 function prizeData(){return [...document.querySelectorAll('.prize-row')].map(r=>({name:r.querySelector('.pname').value.trim(),qty:+r.querySelector('.pqty').value||0})).filter(p=>p.name&&p.qty>0);}
-function prizeTotals(){const count=clampCount(),win=prizeData().reduce((a,p)=>a+p.qty,0);return {count,win,lose:count-win};}
-function updatePrizeSummary(){const t=prizeTotals(),el=$('prizeSummary');if(!el)return;const bad=t.lose<0;el.classList.toggle('over',bad);el.innerHTML=`<b>${mode==='rain'?'抽獎池':'總格數'} ${t.count}</b><span>有獎 ${t.win}</span><span>${bad?'超過 '+Math.abs(t.lose)+' 份':'再接再厲 '+t.lose}</span>`;}
-function validatePrizeCount(){const t=prizeTotals();if(t.win>t.count){toastMsg(`⚠️ 有獎 ${t.win} 個，超過${mode==='rain'?'抽獎池總份數':'總格數'} ${t.count}`,3500);$('prizeSummary').scrollIntoView({behavior:'smooth',block:'center'});return false;}return true;}
+function prizeTotals(){const win=prizeData().reduce((a,p)=>a+p.qty,0),count=mode==='random'?Math.max(1,win):clampCount();return {count,win,lose:mode==='random'?0:count-win};}
+function updatePrizeSummary(){const t=prizeTotals(),el=$('prizeSummary');if(!el)return;if(mode==='random'){el.classList.remove('over');el.innerHTML=`<b>獎品名額 ${t.win}</b><span>待抽名單 ${randomNamesData().length}</span><span>每人最多 ${+$('randomMaxWins').value>=9999?'不限':$('randomMaxWins').value+' 次'}</span>`;return;}const bad=t.lose<0;el.classList.toggle('over',bad);el.innerHTML=`<b>${mode==='rain'?'抽獎池':'總格數'} ${t.count}</b><span>有獎 ${t.win}</span><span>${bad?'超過 '+Math.abs(t.lose)+' 份':'再接再厲 '+t.lose}</span>`;}
+function validatePrizeCount(){const t=prizeTotals();if(mode==='random'){if(!t.win){toastMsg('⚠️ 請至少設定一個獎品');return false;}if(!randomNamesData().length){toastMsg('⚠️ 請輸入待抽名單');return false;}return true;}if(t.win>t.count){toastMsg(`⚠️ 有獎 ${t.win} 個，超過${mode==='rain'?'抽獎池總份數':'總格數'} ${t.count}`,3500);$('prizeSummary').scrollIntoView({behavior:'smooth',block:'center'});return false;}return true;}
 function toastMsg(t,ms=2200){const el=$('toast');el.textContent=t;el.style.display='block';clearTimeout(window.__toastTimer);window.__toastTimer=setTimeout(()=>el.style.display='none',ms);}
 function escapeAdmin(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
 function isLoseResult(x){return !!(x&&(x.isLose||/^(再接再厲|未中獎|沒中獎|謝謝惠顧|銘謝惠顧)$/u.test(String(x.prize||'').trim())));}
 function setCreatedStatus(ok,text,sub=''){const el=$('newDrawStatus');el.className='new-draw-status '+(ok?'success':'idle');el.innerHTML=`<b>${escapeAdmin(text)}</b>${sub?`<br><span>${escapeAdmin(sub)}</span>`:''}`;}
 function showRoomIdentity(){if(!roomId){$('drawCodeBadge').style.display='none';return;}$('drawCodeBadge').style.display='inline-flex';$('drawCodeBadge').textContent='抽獎編號 '+roomId;$('playerUrl').value=location.origin+'/play.html?room='+roomId;}
-function currentPreview(){const sch=scheduleData();return {title:$('title').value||'歡樂抽獎活動',mode,count:clampCount(),note:$('note').value,limitOnePerPlayer:$('limitOnePerPlayer').checked,balloonShape,balloonFloat:$('balloonFloat').checked,eggStyle,boardCols:adminBoardCols,useScheduledStart:sch.useScheduledStart,startAt:sch.startAt,rain:rainSettings(),results:room?.results||[],prizes:room?.prizes||prizeData().map(p=>({...p,left:p.qty}))};}
-function bodyFromForm(){const sch=scheduleData();return {adminToken,title:$('title').value,mode,count:clampCount(),note:$('note').value,limitOnePerPlayer:$('limitOnePerPlayer').checked,balloonShape,balloonFloat:$('balloonFloat').checked,eggStyle,boardCols:adminBoardCols,useScheduledStart:sch.useScheduledStart,startAt:sch.startAt,rain:rainSettings(),prizes:prizeData()};}
+function currentPreview(){const sch=scheduleData();return {title:$('title').value||'歡樂抽獎活動',mode,count:clampCount(),note:$('note').value,limitOnePerPlayer:$('limitOnePerPlayer').checked,balloonShape,balloonFloat:$('balloonFloat').checked,eggStyle,boardCols:adminBoardCols,useScheduledStart:sch.useScheduledStart,startAt:sch.startAt,rain:rainSettings(),random:randomSettings(),results:room?.results||[],prizes:room?.prizes||prizeData().map(p=>({...p,left:p.qty}))};}
+function bodyFromForm(){const sch=scheduleData();return {adminToken,title:$('title').value,mode,count:clampCount(),note:$('note').value,limitOnePerPlayer:$('limitOnePerPlayer').checked,balloonShape,balloonFloat:$('balloonFloat').checked,eggStyle,boardCols:adminBoardCols,useScheduledStart:sch.useScheduledStart,startAt:sch.startAt,rain:rainSettings(),random:randomSettings(),prizes:prizeData()};}
 
 async function createRoom(){
   if(!validatePrizeCount()||!validateSchedule())return;
@@ -253,18 +300,18 @@ async function createRoom(){
     roomId=j.id;adminToken=j.adminToken;showRoomIdentity();localStorage.setItem('raffleAdmin',JSON.stringify({roomId,adminToken}));
     socket.emit('room:join',roomId);socket.emit('admin:claim',{id:roomId,adminToken});
     const saved=await fetch('/api/rooms/'+roomId+'/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(bodyFromForm())}).then(r=>r.json());
-    if(!saved.ok)throw new Error(saved.message||'save');room=saved.room;render();$('controlState').textContent='抽獎 '+roomId+'｜🟢 已產生';
+    if(!saved.ok)throw new Error(saved.message||'save');room=saved.room;restoreRandomControls(room);render();$('controlState').textContent='抽獎 '+roomId+'｜🟢 已產生';
     setCreatedStatus(true,'✅ 新抽獎已產生：'+roomId,'玩家網址已建立，可以直接按「開啟玩家頁」測試。');btn.textContent='✅ 已產生 '+roomId;toastMsg('✅ 新抽獎 '+roomId+' 已成功產生',3200);
   }catch(e){console.error(e);setCreatedStatus(false,'❌ 產生新抽獎失敗','請確認黑色視窗的 npm start 仍在執行。');toastMsg(e.message&&e.message!=='create'?e.message:'產生新抽獎失敗',3800);}
   finally{btn.disabled=false;setTimeout(()=>btn.textContent='🔄 產生新抽獎',2500);}
 }
 async function save(){
   if(!validatePrizeCount()||!validateSchedule())return;if(!roomId)return toastMsg('請先產生新抽獎');if(control!=='control')return toastMsg('目前為唯讀模式');
-  try{const j=await fetch('/api/rooms/'+roomId+'/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(bodyFromForm())}).then(r=>r.json());if(!j.ok)return toastMsg(j.message||'儲存失敗',3800);room=j.room;render();setCreatedStatus(true,'✅ 抽獎 '+roomId+' 已儲存','玩家頁已同步最新設定。');toastMsg('✅ 已儲存並同步玩家頁');}catch(e){toastMsg('儲存失敗，請再試一次');}
+  try{const j=await fetch('/api/rooms/'+roomId+'/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(bodyFromForm())}).then(r=>r.json());if(!j.ok)return toastMsg(j.message||'儲存失敗',3800);room=j.room;restoreRandomControls(room);render();setCreatedStatus(true,'✅ 抽獎 '+roomId+' 已儲存','玩家頁已同步最新設定。');toastMsg('✅ 已儲存並同步玩家頁');}catch(e){toastMsg('儲存失敗，請再試一次');}
 }
 socket.on('admin:control',x=>{control=x.mode;$('controlState').innerHTML=x.mode==='control'?`抽獎 ${roomId}｜🟢 操作中`:`抽獎 ${roomId}｜🔒 其他主控操作中 <button class="btn" onclick="takeover()">接手主控</button>`;});
 function takeover(){socket.emit('admin:takeover',{id:roomId,adminToken});}
-socket.on('room:update',r=>{room=r;if([5,7,8].includes(+r.boardCols))adminBoardCols=+r.boardCols;render();});
+socket.on('room:update',r=>{const keepNames=room?.random?.names;if(keepNames&&r.random)r.random.names=keepNames;room=r;if([5,7,8].includes(+r.boardCols))adminBoardCols=+r.boardCols;render();});
 
 function setAdminBoardCols(n,silent=false){n=[5,7,8].includes(+n)?+n:5;adminBoardCols=n;if(room)room.boardCols=n;document.querySelectorAll('.admin-size-control [data-cols]').forEach(b=>b.classList.toggle('active',+b.dataset.cols===n));renderAdminBoard();if(!silent&&mode!=='rain')toastMsg(`盤面已選每排 ${n} 格，按「儲存並開放抽獎」後同步所有玩家`,1800);}
 function assetFor(p,i){if(p.mode==='balloon')return `/assets/balloon-${p.balloonShape||'round'}.png`;return `/assets/egg-${p.eggStyle==='gold'?'gold':'color'}-${String((i%(p.eggStyle==='gold'?8:16))+1).padStart(2,'0')}.png`;}
@@ -274,9 +321,104 @@ function renderRainAdminPreview(p){
   $('adminBoard').className='admin-board rain-admin-board';
   $('adminBoard').innerHTML=`<div class="rain-admin-preview"><div class="rain-preview-icon">🧧</div><div><h3>${modeLabel()}</h3><p>${rule}</p><div class="rain-preview-stats"><span>抽獎池 <b>${t.count}</b> 份</span><span>有獎 <b>${t.win}</b></span><span>再接再厲 <b>${Math.max(0,t.lose)}</b></span><span>已開獎 <b>${(p.results||[]).length}</b></span></div><div class="rain-preview-note">A／B／C 最後開獎都直接使用上方同一份獎項設定與剩餘庫存。</div></div></div>`;
 }
+
+function randomEligibleClient(){
+  const names=randomNamesData(),max=+$('randomMaxWins').value||1;
+  if(max>=9999)return names;
+  const wins={};(room?.results||[]).filter(x=>x.source==='random').forEach(x=>wins[x.player]=(wins[x.player]||0)+1);
+  return names.filter(n=>(wins[n]||0)<max);
+}
+function randomResultGroups(results=room?.results||[]){
+  const g={};results.filter(x=>x.source==='random').forEach(x=>(g[x.prize]||(g[x.prize]=[])).push(x.player));return g;
+}
+function randomResultsHtml(results=room?.results||[]){
+  const g=randomResultGroups(results),entries=Object.entries(g);
+  if(!entries.length)return '<div class="random-empty">尚未抽出得獎者</div>';
+  return entries.map(([prize,names])=>`<div class="random-result-group"><div class="random-result-title">🎁 ${escapeAdmin(prize)}｜${names.length} 位</div><div class="random-winner-grid">${names.map((n,i)=>`<div class="random-winner c${i%4}">${escapeAdmin(n)}</div>`).join('')}</div></div>`).join('');
+}
+function renderRandomAdminPreview(p){
+  const prizes=(p.prizes||[]).filter(x=>!x.isLose),eligible=randomEligibleClient(),drawn=(p.results||[]).filter(x=>x.source==='random').length;
+  const opts=prizes.map(x=>`<option value="${escapeAdmin(x.name)}">${escapeAdmin(x.name)}（剩 ${x.left??x.qty}）</option>`).join('');
+  $('adminBoard').className='admin-board random-admin-board';
+  $('adminBoard').innerHTML=`<div class="random-draw-panel">
+    <div class="random-stats-row"><span>待抽名單 <b>${randomNamesData().length}</b></span><span>目前可抽 <b>${eligible.length}</b></span><span>已抽出 <b>${drawn}</b></span></div>
+    <label class="random-active-prize">目前要抽的獎品<select id="randomActivePrize" class="input">${opts||'<option>沒有剩餘獎品</option>'}</select></label>
+    <div class="random-slot-machine"><small>🎰 系統隨機抽取</small><div id="randomSlotName">準備抽獎</div></div>
+    <div class="random-action-row"><button id="randomSingleBtn" class="btn primary" onclick="randomDrawOne()" ${(!prizes.some(x=>(x.left??x.qty)>0)||!eligible.length)?'disabled':''}>🎰 單一抽獎</button><button id="randomAllBtn" class="btn pink" onclick="randomDrawAll()" ${(!prizes.some(x=>(x.left??x.qty)>0)||!eligible.length)?'disabled':''}>🎉 一次全部抽完</button></div>
+    <div id="randomBatchProgress" class="random-batch-progress" hidden><b id="randomBatchText">抽獎中…</b><div><i id="randomBatchBar"></i></div></div>
+    <div id="randomResultArea" class="random-results">${randomResultsHtml()}</div>
+    <div class="random-bottom-actions"><button class="btn" onclick="copyRandomResults()">📋 複製得獎結果</button><button class="btn danger" onclick="resetRandomAll()">↺ 重設全部</button></div>
+  </div>`;
+}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+async function animateRandomName(finalName,fast=false){
+  const el=$('randomSlotName');if(!el)return;
+  const pool=randomNamesData();let loops=fast?4:10;
+  for(let i=0;i<loops;i++){el.textContent=pool.length?pool[Math.floor(Math.random()*pool.length)]:'---';await sleep((fast?32:55)+i*(fast?5:12));}
+  el.textContent=finalName;el.classList.add('hit');setTimeout(()=>el?.classList.remove('hit'),500);
+}
+async function randomDrawOne(){
+  if(!roomId||mode!=='random')return toastMsg('請先建立系統隨機抽取活動');
+  if(control!=='control')return toastMsg('目前為唯讀模式');
+  const prize=$('randomActivePrize')?.value;if(!prize)return toastMsg('目前沒有可抽的獎品');
+  const btn=$('randomSingleBtn');if(btn)btn.disabled=true;
+  try{
+    const j=await fetch('/api/rooms/'+roomId+'/random/draw-one',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({adminToken,prize})}).then(r=>r.json());
+    if(!j.ok)return toastMsg(j.message||'抽獎失敗',3500);
+    if(j.serverNow){const t=Date.parse(j.serverNow);if(Number.isFinite(t))serverOffsetMs=t-Date.now();}
+    await animateRandomName(j.result.player,false);room=j.room;restoreRandomControls(room);render();toastMsg(`🎉 ${j.result.player}｜${j.result.prize}`,2600);
+  }catch(e){toastMsg('抽獎連線失敗');}
+  finally{if(btn)btn.disabled=false;}
+}
+async function randomDrawAll(){
+  if(!roomId||mode!=='random')return toastMsg('請先建立系統隨機抽取活動');
+  if(control!=='control')return toastMsg('目前為唯讀模式');
+  const allBtn=$('randomAllBtn'),oneBtn=$('randomSingleBtn');if(allBtn)allBtn.disabled=true;if(oneBtn)oneBtn.disabled=true;
+  try{
+    const j=await fetch('/api/rooms/'+roomId+'/random/draw-all',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({adminToken})}).then(r=>r.json());
+    if(!j.ok)return toastMsg(j.message||'抽獎失敗',3500);
+    if(j.serverNow){const t=Date.parse(j.serverNow);if(Number.isFinite(t))serverOffsetMs=t-Date.now();}
+    lastRandomBatch=j.results||[];
+    if(!lastRandomBatch.length)return toastMsg('目前沒有可以抽出的結果');
+    const progress=$('randomBatchProgress');if(progress)progress.hidden=false;
+    const partial=[];
+    for(let i=0;i<lastRandomBatch.length;i++){
+      const x=lastRandomBatch[i],fast=i>=10;
+      if($('randomBatchText'))$('randomBatchText').textContent=`正在抽：${x.prize}　${i+1} / ${lastRandomBatch.length}`;
+      if($('randomBatchBar'))$('randomBatchBar').style.width=Math.round((i/lastRandomBatch.length)*100)+'%';
+      await animateRandomName(x.player,fast);partial.push(x);
+      if($('randomResultArea'))$('randomResultArea').innerHTML=randomResultsHtml(partial);
+      await sleep(fast?55:140);
+    }
+    if($('randomBatchBar'))$('randomBatchBar').style.width='100%';
+    if($('randomBatchText'))$('randomBatchText').textContent=`✅ 抽獎完成，共 ${lastRandomBatch.length} 位得主`;
+    room=j.room;restoreRandomControls(room);
+    setTimeout(()=>render(),650);
+  }catch(e){toastMsg('抽獎連線失敗');}
+  finally{if(allBtn)allBtn.disabled=false;if(oneBtn)oneBtn.disabled=false;}
+}
+async function copyTextRobust(text){
+  if(navigator.clipboard&&window.isSecureContext){try{await navigator.clipboard.writeText(text);return true;}catch(e){}}
+  const ta=document.createElement('textarea');ta.value=text;ta.readOnly=true;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy');}catch(e){}ta.remove();return ok;
+}
+async function copyRandomResults(){
+  const results=(room?.results||[]).filter(x=>x.source==='random');if(!results.length)return toastMsg('目前還沒有得獎結果');
+  const groups=randomResultGroups(results),text=`抽獎時間：${fmtServerDateTime()}\n`+Object.entries(groups).map(([p,n])=>`${p}：${n.join('、')}`).join('\n');
+  const ok=await copyTextRobust(text);if(ok)toastMsg('✅ 已複製得獎結果');else prompt('請長按複製以下內容：',text);
+}
+async function resetRandomAll(){
+  if(!roomId||mode!=='random')return;if(!confirm('確定重設全部？\n將清空待抽名單與本場得獎結果，獎品數量會恢復。'))return;
+  try{
+    const j=await fetch('/api/rooms/'+roomId+'/random/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({adminToken})}).then(r=>r.json());
+    if(!j.ok)return toastMsg(j.message||'重設失敗');
+    room=j.room;$('randomNames').value='';lastRandomBatch=[];updateRandomNameCount();render();toastMsg('✅ 已重設全部');
+  }catch(e){toastMsg('重設連線失敗');}
+}
+
 function renderAdminBoard(){
   const p=currentPreview();
   if(p.mode==='rain'){renderRainAdminPreview(p);return;}
+  if(p.mode==='random'){renderRandomAdminPreview(p);return;}
   const used=new Map((p.results||[]).map(x=>[x.slot,x])),board=$('adminBoard');
   board.className=`admin-board user-sized-board cols-${adminBoardCols}`;board.style.setProperty('--board-cols',adminBoardCols);
   board.innerHTML=Array.from({length:p.count},(_,i)=>{
@@ -291,10 +433,10 @@ function renderAdminBoard(){
 }
 function render(){
   updatePrizeSummary();syncOptionPanels();
-  const total=clampCount(),drawn=room?.results?.length||0;
+  const total=mode==='random'?prizeData().reduce((a,p)=>a+p.qty,0):clampCount(),drawn=room?.results?.length||0;
   $('drawn').textContent=drawn;$('left').textContent=Math.max(0,total-drawn);
   renderAdminBoard();
-  $('records').innerHTML=room&&room.results.length?room.results.slice().sort((a,b)=>a.slot-b.slot).map(x=>`<tr><td>${mode==='rain'?'第'+x.slot+'次':'第'+x.slot+'格'}</td><td>${isLoseResult(x)?'再接再厲':escapeAdmin(x.prize)}</td><td>${escapeAdmin(x.player)}</td><td>${new Date(x.time).toLocaleTimeString()}</td></tr>`).join(''):'<tr><td colspan="4" class="muted">尚無紀錄</td></tr>';
+  $('records').innerHTML=room&&room.results.length?room.results.slice().sort((a,b)=>a.slot-b.slot).map(x=>`<tr><td>${(mode==='rain'||mode==='random')?'第'+x.slot+'次':'第'+x.slot+'格'}</td><td>${isLoseResult(x)?'再接再厲':escapeAdmin(x.prize)}</td><td>${escapeAdmin(x.player)}</td><td>${new Date(x.time).toLocaleTimeString()}</td></tr>`).join(''):'<tr><td colspan="4" class="muted">尚無紀錄</td></tr>';
 }
 function toggleAdminReveal(){if(mode==='rain')return toastMsg('紅包雨沒有固定格子，不需要主控清格');if(!roomId||!room)return toastMsg('請先產生新抽獎');if(control!=='control')return toastMsg('目前為唯讀模式');adminRevealMode=!adminRevealMode;const btn=$('adminRevealBtn');btn.classList.toggle('pink',adminRevealMode);btn.textContent=adminRevealMode?'✅ 主控清剩餘格 ON':'🧹 開啟主控清剩餘格';renderAdminBoard();}
 function adminTapSound(){try{const c=audioCtx||(audioCtx=new (window.AudioContext||window.webkitAudioContext)());if(c.state==='suspended')c.resume();const o=c.createOscillator(),g=c.createGain();o.type='triangle';o.frequency.value=mode==='balloon'?520:410;o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.09,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.11);o.start();o.stop(c.currentTime+.12);}catch(e){}}
@@ -303,7 +445,7 @@ async function adminRevealClick(slot){if(!adminRevealMode||mode==='rain')return;
 
 function loadImg(src){return new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=reject;im.src=src;});}
 async function copyBoardImage(){
-  if(mode==='rain')return toastMsg('紅包雨沒有固定整盤畫面，主控可直接複製抽獎名單');
+  if(mode==='rain'||mode==='random')return toastMsg(mode==='random'?'系統隨機抽取沒有固定整盤畫面，可直接複製得獎結果':'紅包雨沒有固定整盤畫面，主控可直接複製抽獎名單');
   const p=currentPreview();if(!roomId)return toastMsg('請先產生新抽獎，再複製正式盤面');
   const cols=[5,7,8].includes(+p.boardCols)?+p.boardCols:5,cellW=cols>=8?116:(cols>=7?124:145),cellH=cellW,gap=cols>=8?6:8,pad=28,header=120,rows=Math.ceil(p.count/cols),c=document.createElement('canvas'),ctx=c.getContext('2d');
   c.width=pad*2+cols*cellW+(cols-1)*gap;c.height=header+rows*cellH+(rows-1)*gap+pad;
@@ -323,25 +465,26 @@ function copyShare(){
   let how='';
   if(mode==='balloon')how='🎯 選擇一顆氣球進行抽獎';
   else if(mode==='egg')how='🎯 選擇一顆金蛋進行抽獎';
+  else if(mode==='random')how='🎯 由主控從待抽名單中系統隨機抽取得獎者';
   else if(rainSubMode==='A')how=`🎯 ${rainSettings().A.duration} 秒內搶滿 ${rainSettings().A.targetPackets} 包，達標後按「立即抽獎」`;
   else if(rainSubMode==='B')how='🎯 點一個紅包直接開獎';
   else how=`🎯 ${rainSettings().C.duration} 秒內累積 ${rainSettings().C.targetScore} 分，達標後按「立即抽獎」`;
   cp(`🎉 ${t}\n${modeLabel()}\n${schedule}${how}\n${limit}${n?'\n📝 備註：\n'+n+'\n':''}\n👇 點這裡參加\n${u}\n\n輸入遊戲名後即可進入\n祝大家好運 🍀`);
 }
-function copyList(){if(!room||!room.results.length)return toastMsg('目前還沒有抽獎紀錄');cp(room.results.slice().sort((a,b)=>a.slot-b.slot).map(x=>`${mode==='rain'?'第'+x.slot+'次':'第'+x.slot+'格'} > ${isLoseResult(x)?'再接再厲':x.prize} > ${x.player}`).join('\n'));}
+function copyList(){if(!room||!room.results.length)return toastMsg('目前還沒有抽獎紀錄');cp(room.results.slice().sort((a,b)=>a.slot-b.slot).map(x=>`${(mode==='rain'||mode==='random')?'第'+x.slot+'次':'第'+x.slot+'格'} > ${isLoseResult(x)?'再接再厲':x.prize} > ${x.player}`).join('\n'));}
 async function endRoom(){if(!roomId)return toastMsg('請先產生新抽獎');await fetch('/api/rooms/'+roomId+'/end',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({adminToken})});toastMsg('抽獎已結束');}
 async function deleteRoom(){if(!roomId||!confirm('確定刪除這場抽獎？'))return;await fetch('/api/rooms/'+roomId,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({adminToken})});localStorage.removeItem('raffleAdmin');location.reload();}
 
 async function restoreOld(){
   adminRevealMode=false;const old=localStorage.getItem('raffleAdmin');if(!old){render();return;}
   try{
-    const x=JSON.parse(old),resp=await fetch('/api/rooms/'+x.roomId),j=await resp.json();if(!j.ok)throw new Error('expired');
-    roomId=x.roomId;adminToken=x.adminToken;room=j.room;showRoomIdentity();$('title').value=room.title;mode=room.mode;$('count').value=room.count;$('note').value=room.note||'';balloonShape=room.balloonShape||'round';eggStyle=room.eggStyle||'color';adminBoardCols=[5,7,8].includes(+room.boardCols)?+room.boardCols:5;$('balloonFloat').checked=room.balloonFloat!==false;$('limitOnePerPlayer').checked=room.limitOnePerPlayer!==false;restoreScheduleControls(room);restoreRainControls(room);
+    const x=JSON.parse(old),resp=await fetch('/api/rooms/'+x.roomId+'/admin-state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({adminToken:x.adminToken})}),j=await resp.json();if(!j.ok)throw new Error('expired');
+    roomId=x.roomId;adminToken=x.adminToken;room=j.room;showRoomIdentity();$('title').value=room.title;mode=room.mode;$('count').value=room.count;$('note').value=room.note||'';balloonShape=room.balloonShape||'round';eggStyle=room.eggStyle||'color';adminBoardCols=[5,7,8].includes(+room.boardCols)?+room.boardCols:5;$('balloonFloat').checked=room.balloonFloat!==false;$('limitOnePerPlayer').checked=room.limitOnePerPlayer!==false;restoreScheduleControls(room);restoreRainControls(room);restoreRandomControls(room);
     $('prizes').innerHTML='';room.prizes.filter(p=>!p.isLose).forEach(p=>addPrize(p.name,p.qty));updatePrizeSummary();syncOptionPanels();
     socket.emit('room:join',roomId);socket.emit('admin:claim',{id:roomId,adminToken});setCreatedStatus(true,'✅ 已恢復抽獎：'+roomId,'可以繼續操作。');render();
   }catch(e){localStorage.removeItem('raffleAdmin');roomId='';adminToken='';room=null;$('playerUrl').value='';setCreatedStatus(false,'上次抽獎已失效','請按「產生新抽獎」建立新的編號。');render();}
 }
-setAdminBoardCols(adminBoardCols,true);updatePrizeSummary();updateScheduleFields();syncRainTabs();syncOptionPanels();
+setAdminBoardCols(adminBoardCols,true);updateRandomNameCount();updatePrizeSummary();updateScheduleFields();syncRainTabs();syncOptionPanels();
 setInterval(()=>{if($('useScheduledStart').checked)updateScheduleFields();},1000);
 restoreOld();
 </script>
