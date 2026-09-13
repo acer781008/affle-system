@@ -601,8 +601,9 @@ body.admin-body::after,body.login-body::after,body.player-body::after{right:-30p
 .rain-float-score{position:absolute;z-index:18;transform:translate(-50%,-50%);font-size:18px;font-weight:1000;text-shadow:0 2px 7px #603c3a30;animation:rainScoreFloat .78s ease-out forwards;pointer-events:none;white-space:nowrap;padding:5px 10px;border-radius:999px;background:#fffef0e6;border:1px solid #fff6c0}.rain-float-score.positive{color:#c93431}.rain-float-score.negative{color:#7f315d;background:#fff0f7e8;border-color:#f4bfd5}.rain-float-score.long{font-size:15px;padding:6px 10px}
 @keyframes rainScoreFloat{to{transform:translate(-50%,-105px) scale(1.13);opacity:0}}
 .rain-progress-box{padding:11px 13px;background:#fffaf1}.rain-progress-row{display:flex;justify-content:space-between;align-items:center;font-weight:850;color:#74574a}.rain-progress-row b{color:#d33837}.rain-progress-track{height:14px;border-radius:999px;background:#eadfd8;overflow:hidden;margin-top:7px}.rain-progress-track i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ff8174,#e93f42);border-radius:999px;transform:scaleX(0);transform-origin:left center;transition:transform .12s linear;will-change:transform}
-.rain-qualified{position:absolute;z-index:30;left:50%;top:48%;transform:translate(-50%,-50%);width:min(88%,390px);padding:18px;border-radius:24px;background:#fffaf1f5;border:4px solid #fff;box-shadow:0 18px 45px #78433e36;text-align:center}.rq-icon{font-size:51px}.rain-qualified h2{margin:2px 0;color:#d23837}.rain-qualified p{margin:5px 0 10px;color:#795749;font-weight:850}
-.rain-reel{height:65px;display:grid;place-items:center;margin:10px 0;border-radius:17px;background:linear-gradient(#fff7d8,#ffe4a5);border:3px solid #eebc4b;color:#a83426;font-weight:1000;font-size:22px;overflow:hidden}.rain-draw-btn{width:100%;background:linear-gradient(135deg,#7568e8,#56aee8);color:#fff;font-size:17px;border-color:#665ad4;box-shadow:0 7px 15px #665ad433}.rain-draw-btn:hover{filter:brightness(1.04)}.rain-again-btn{margin-top:12px;min-width:230px}
+.rain-qualified-overlay{position:fixed;inset:0;z-index:9998;display:grid;place-items:center;background:#342a465c;padding:max(14px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(18px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));box-sizing:border-box}
+.rain-qualified{position:relative;z-index:9999;width:min(92vw,390px);max-height:calc(100dvh - 90px);overflow:auto;padding:15px;border-radius:22px;background:#fffaf1;border:4px solid #fff;box-shadow:0 18px 45px #342a4652;text-align:center;box-sizing:border-box}.rq-icon{font-size:42px;line-height:1}.rain-qualified h2{margin:3px 0;color:#d23837;font-size:28px}.rain-qualified p{margin:4px 0 8px;color:#795749;font-weight:850}
+.rain-reel{height:54px;display:grid;place-items:center;margin:7px 0;border-radius:15px;background:linear-gradient(#fff7d8,#ffe4a5);border:3px solid #eebc4b;color:#a83426;font-weight:1000;font-size:20px;overflow:hidden}.rain-draw-btn{width:100%;min-height:52px;background:linear-gradient(135deg,#7568e8,#56aee8);color:#fff;font-size:18px;border-color:#665ad4;box-shadow:0 7px 15px #665ad433}.rain-draw-btn:hover{filter:brightness(1.04)}.rain-again-btn{margin-top:12px;min-width:230px}
 .rain-spark{position:absolute;z-index:40;color:#fff18a;font-size:20px;text-shadow:0 0 10px #ffd949;pointer-events:none;animation:rainSpark .9s ease-out forwards}@keyframes rainSpark{to{transform:translate(var(--sx),var(--sy)) scale(1.5);opacity:0}}
 .rain-mini-result{position:absolute;z-index:31;left:50%;top:47%;transform:translate(-50%,-50%);padding:14px 17px;border-radius:17px;background:#fff;border:3px solid #ffd263;box-shadow:0 13px 34px #67463d33;font-size:18px;font-weight:1000;color:#ae3a31}.rain-mini-result.lose{color:#75506d;border-color:#d8bfdc}
 .rain-end-card{max-width:520px;margin:15px auto;padding:25px 18px;border-radius:24px;background:linear-gradient(145deg,#fff8ed,#fff,#f0f8ff);border:2px solid #fff;box-shadow:0 13px 32px #604e5a16;text-align:center}.rain-end-icon{font-size:56px}.rain-end-card h2{margin:4px 0;color:#cc3b38}.rain-end-card p{font-weight:850;color:#71584e}.rain-end-card .btn{margin-top:10px}.rain-done-note{margin-top:12px;padding:10px;border-radius:13px;background:#f2f0f7;color:#756d82;font-size:13px;font-weight:850}
@@ -657,6 +658,30 @@ body.admin-body::after,body.login-body::after,body.player-body::after{right:-30p
   .falling-redpacket{width:60px;height:76px}
 }
 
+
+
+/* V1.3.2：補回 V1.2.5～V1.2.7 紅包雨修正 */
+@media(max-width:700px){
+  .rain-qualified-overlay{align-items:center;padding-top:max(10px,env(safe-area-inset-top));padding-bottom:max(16px,env(safe-area-inset-bottom))}
+  .rain-qualified{width:min(94vw,370px);max-height:calc(100dvh - 70px);padding:13px}
+  .rain-qualified .rq-icon{font-size:38px}
+  .rain-qualified h2{font-size:26px}
+  .rain-reel{height:50px;margin:6px 0;font-size:19px}
+  .rain-draw-btn{min-height:54px;font-size:18px}
+}
+.rain-score-legend{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 8px;margin-top:10px}
+.rain-score-legend span{display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;border-radius:999px;font-size:12px;font-weight:900;line-height:1.2;background:#fff}
+.rain-score-legend .legend-red{color:#b52d31;border:1px solid #f1b2b4;background:#fff3f3}
+.rain-score-legend .legend-gold{color:#a35a11;border:1px solid #f2d08a;background:#fff8df}
+.rain-score-legend .legend-purple{color:#684378;border:1px solid #d7bfdf;background:#f8f0fb}
+.rain-score-note{margin-top:7px;font-size:12px;font-weight:800;color:#80695d}
+.falling-redpacket.bomb{width:66px;height:70px}
+.falling-redpacket.bomb i{inset:4px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#565b66 0%,#20232b 45%,#090b0f 78%);border:3px solid #7b8190;box-shadow:inset 0 2px 0 #ffffff22,0 5px 8px #12151c35}
+.falling-redpacket.bomb i:before{content:"";position:absolute;width:15px;height:23px;border-radius:9px 9px 2px 2px;background:#5e4a31;border:2px solid #9b7543;left:50%;top:-15px;transform:translateX(-50%) rotate(10deg)}
+.falling-redpacket.bomb i:after{content:"✦";position:absolute;right:1px;top:-24px;color:#ffd44f;font-style:normal;font-size:22px;text-shadow:0 0 7px #ff9d00}
+.falling-redpacket.bomb i span{left:50%;top:50%;color:#fff;font-size:27px;filter:none}
+.rain-float-score.bomb{color:#fff;background:#2d3039ee;border-color:#696f7d;text-shadow:none;font-size:16px}
+.rain-score-legend .legend-bomb{color:#343740;border:1px solid #a9adb7;background:#f2f3f5}
 
 /* V1.3.0：系統隨機抽取＋伺服器時間 */
 .top-right-status{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}

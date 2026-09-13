@@ -67,7 +67,7 @@
 <script>
 const $=id=>document.getElementById(id),qs=new URLSearchParams(location.search),roomId=(qs.get('room')||'').toUpperCase(),socket=io();
 let room=null,player='',spinning=false,hasDrawn=false,audioCtx=null,popAudioBuffer=null,lastResult=null,serverOffsetMs=0,scheduleWasPending=false,scheduleTimer=null,rainPlayer=null;
-const rainState={playing:false,qualified:false,drawing:false,requesting:false,timeLeft:0,hits:0,score:0,playId:'',packetLimit:1,spawnTimer:null,clockTimer:null};
+const rainState={playing:false,qualified:false,drawing:false,requesting:false,starting:false,timeLeft:0,hits:0,score:0,playId:'',packetLimit:1,spawnTimer:null,clockTimer:null};
 const DEVICE_KEY='raffleDeviceId';
 let deviceId=localStorage.getItem(DEVICE_KEY);
 if(!deviceId){deviceId=(crypto?.randomUUID?.()||('dev-'+Date.now()+'-'+Math.random().toString(36).slice(2)));localStorage.setItem(DEVICE_KEY,deviceId);}
@@ -217,34 +217,63 @@ async function draw(slot){
 /* ==================== 紅包雨 A / B / C ==================== */
 function rainCfg(){return room?.rain||{subMode:'A',speed:'fast',density:'high',sound:true,maxWins:1,A:{duration:30,targetPackets:20,maxPlays:3},B:{duration:20,packetLimit:1,maxPlays:1},C:{duration:30,targetScore:50,difficulty:'normal',maxPlays:3}};}
 function rainModeCfg(){const r=rainCfg();return r[r.subMode]||r.A;}
-function renderRainHome(message=''){
+function renderRainHome(message=''){removeRainQualifiedOverlay();
   stopRainAll(false);rainState.qualified=false;rainState.drawing=false;rainState.requesting=false;
   if(beforeScheduledStart()){$('hint').textContent='⏳ 尚未開放紅包雨';$('area').innerHTML='<div class="schedule-waiting-board">🧧<b>紅包雨即將開始</b><span>倒數結束會自動開放，不用重新整理。</span></div>';return;}
-  const r=rainCfg(),sub=r.subMode,mc=rainModeCfg(),plays=rainPlayer?.plays||0,wins=rainPlayer?.wins||0;
+  const r=rainCfg(),sub=r.subMode,mc=rainModeCfg(),plays=rainPlayer?.plays||0,wins=rainPlayer?.wins||0,canDraw=wins<r.maxWins;
   $('hint').textContent=`🧧 紅包雨 ${rainModeLabel()}`;
-  const rule=sub==='A'?`${mc.duration} 秒內搶滿 <b>${mc.targetPackets}</b> 包，達標後按「立即抽獎」。`:sub==='B'?`點到紅包就直接開獎；本局可搶 <b>${mc.packetLimit}</b> 包。`:`${mc.duration} 秒內累積到 <b>${mc.targetScore}</b> 分；紅包可能加分或扣分，最低 0 分。`;
+  const rule=sub==='A'
+    ?`${mc.duration} 秒內搶滿 <b>${mc.targetPackets}</b> 包，${canDraw?'達標後按「立即抽獎」。':'達標即完成挑戰；本場開獎次數已用完。'}`
+    :sub==='B'
+      ?`${canDraw?'點到紅包就直接開獎':'點到紅包即完成挑戰；本場開獎次數已用完'}；本局可搶 <b>${mc.packetLimit}</b> 包。`
+      :`${mc.duration} 秒內累積到 <b>${mc.targetScore}</b> 分；最低 0 分。${canDraw?'達標後可立即抽獎。':'達標即完成挑戰；本場開獎次數已用完。'}<div class="rain-score-legend"><span class="legend-red">🔴 紅色＝一般加分</span><span class="legend-gold">🟡 金色＝高分加分</span><span class="legend-purple">🟣 紫色＝扣分</span><span class="legend-bomb">💣 炸彈＝分數歸零</span></div><div class="rain-score-note">加／扣分與炸彈出現機率會依難度由系統自動分配；分數最低維持 0。</div>`;
   $('area').innerHTML=`<div class="rain-start-card">
     <div class="rain-start-hero"><div class="rain-mascot-packet">福</div><div><div class="rain-small-title">🧧 紅包雨</div><h2>${rainModeLabel()}</h2></div></div>
     <div class="rain-rule-box">${rule}</div>
-    <div class="rain-player-stats"><span>已玩 <b>${plays}/${mc.maxPlays}</b></span><span>已獲獎 <b>${wins}/${r.maxWins}</b></span></div>
+    <div class="rain-player-stats"><span>已玩 <b>${plays}/${mc.maxPlays}</b></span><span>已開獎 <b>${wins}/${r.maxWins}</b></span></div>
     ${message?`<div class="rain-home-message">${escapeHtml(message)}</div>`:''}
-    <button class="btn primary rain-start-button" onclick="startRainGame()">▶ 開始挑戰</button>
+    <button id="rainStartBtn" class="btn primary rain-start-button" onclick="startRainGame()">▶ 開始挑戰</button>
   </div>`;
 }
 async function startRainGame(){
   if(beforeScheduledStart())return updateScheduleUI();
+  if(rainState.starting)return;
+  rainState.starting=true;
+  const startBtn=$('rainStartBtn');
+  if(startBtn){startBtn.disabled=true;startBtn.textContent='⏳ 準備中…';}
   try{
     const j=await fetch('/api/rooms/'+roomId+'/rain/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player,deviceId})}).then(r=>r.json());
-    if(!j.ok)return renderRainHome(j.message||'無法開始');
+    if(!j.ok){rainState.starting=false;return renderRainHome(j.message||'無法開始');}
     room=j.room;rainPlayer=j.player;rainState.playId=j.playId;rainState.packetLimit=j.packetLimit||1;rainState.timeLeft=rainModeCfg().duration;rainState.hits=0;rainState.score=0;rainState.playing=false;rainState.qualified=false;rainState.drawing=false;rainState.requesting=false;
+    removeRainQualifiedOverlay();
     buildRainArena();
     let n=3;const center=$('rainCenter');center.innerHTML='<b>3</b><span>準備！</span>';
-    const cd=setInterval(()=>{n--;if(n>0)center.innerHTML=`<b>${n}</b><span>準備！</span>`;else{clearInterval(cd);center.innerHTML='<b>GO!</b><span>快搶紅包！</span>';setTimeout(()=>{if($('rainCenter'))$('rainCenter').classList.add('fade')},380);beginRain();}},620);
-  }catch(e){renderRainHome('連線失敗，請再試一次');}
+    const cd=setInterval(async()=>{
+      n--;
+      if(n>0){if(center)center.innerHTML=`<b>${n}</b><span>準備！</span>`;return;}
+      clearInterval(cd);
+      try{
+        const c=await fetch('/api/rooms/'+roomId+'/rain/confirm-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player,deviceId,playId:rainState.playId})}).then(r=>r.json());
+        if(!c.ok){rainState.starting=false;return renderRainHome(c.message||'無法開始這一局');}
+        room=c.room;rainPlayer=c.player;
+        if(center)center.innerHTML='<b>GO!</b><span>快搶紅包！</span>';
+        setTimeout(()=>{if($('rainCenter'))$('rainCenter').classList.add('fade')},380);
+        rainState.starting=false;
+        beginRain();
+      }catch(e){
+        rainState.starting=false;
+        renderRainHome('連線中斷，本局沒有扣次數，請再試一次');
+      }
+    },620);
+  }catch(e){
+    rainState.starting=false;
+    renderRainHome('連線失敗，本局沒有扣次數，請再試一次');
+  }
 }
 function buildRainArena(){
   const r=rainCfg(),sub=r.subMode;
-  $('hint').textContent=sub==='A'?'🎯 搶滿紅包就能抽獎':sub==='B'?'🧧 點到紅包直接開獎':'🎯 累積到目標分數就能抽獎';
+  const canDraw=(rainPlayer?.wins||0)<r.maxWins;
+  $('hint').textContent=canDraw?(sub==='A'?'🎯 搶滿紅包就能抽獎':sub==='B'?'🧧 點到紅包直接開獎':'🎯 累積到目標分數就能抽獎'):'🎮 本場開獎次數已用完，本局仍可完成挑戰';
   $('area').innerHTML=`<div class="rain-game-wrap">
     <div class="rain-hud">
       <div><span>剩餘時間</span><b id="rainTime">${rainState.timeLeft}</b></div>
@@ -289,6 +318,10 @@ function scoreValue(){
   for(let i=0;i<values.length;i++){acc+=weights[i];if(x<=acc)return values[i];}
   return 2;
 }
+function bombRate(){
+  const d=(rainCfg().C||{}).difficulty||'normal';
+  return d==='easy'?.02:d==='hard'?.06:.04;
+}
 function rainPacketCap(){
   const mobile=matchMedia('(max-width:700px)').matches,d=rainCfg().density;
   return mobile?({normal:8,high:11,max:14}[d]||11):({normal:12,high:18,max:24}[d]||18);
@@ -298,9 +331,13 @@ function spawnRainPacket(){
   const arena=$('rainArena');
   if(arena.querySelectorAll('.falling-redpacket').length>=rainPacketCap())return;
   const sub=rainCfg().subMode,b=document.createElement('button');
-  let score=sub==='C'?scoreValue():null,kind=score!==null&&score<0?'penalty':score!==null&&score>=10?'bonus':Math.random()<.13?'gold':'normal';
-  b.type='button';b.className=`falling-redpacket ${kind}`;b.innerHTML='<i><span>福</span></i>';
+  const isBomb=sub==='C'&&Math.random()<bombRate();
+  let score=sub==='C'&&!isBomb?scoreValue():null;
+  let kind=isBomb?'bomb':sub==='C'?(score<0?'penalty':score>=10?'bonus':'normal'):(Math.random()<.13?'gold':'normal');
+  b.type='button';b.className=`falling-redpacket ${kind}`;
+  b.innerHTML=isBomb?'<i><span>💣</span></i>':'<i><span>福</span></i>';
   b.dataset.score=score===null?'':String(score);
+  b.dataset.effect=isBomb?'reset':'';
   b.style.left=(10+Math.random()*78)+'%';
   const amp=(38+Math.random()*58)*(Math.random()<.5?-1:1);
   b.style.setProperty('--x1',amp+'px');
@@ -318,7 +355,7 @@ function spawnRainPacket(){
   b.addEventListener('animationend',cleanup,{once:true});
   setTimeout(cleanup,dur*1000+350);
 }
-function showFloat(x,y,text,neg=false){const a=$('rainArena');if(!a)return;const f=document.createElement('div');f.className='rain-float-score '+(neg?'negative':'positive')+(String(text).length>4?' long':'');f.textContent=text;const r=a.getBoundingClientRect();f.style.left=(x-r.left)+'px';f.style.top=(y-r.top)+'px';a.appendChild(f);setTimeout(()=>f.remove(),850);}
+function showFloat(x,y,text,neg=false){const a=$('rainArena');if(!a)return;const isBomb=String(text).includes('💥');const f=document.createElement('div');f.className='rain-float-score '+(isBomb?'bomb':neg?'negative':'positive')+(String(text).length>4?' long':'');f.textContent=text;const r=a.getBoundingClientRect();f.style.left=(x-r.left)+'px';f.style.top=(y-r.top)+'px';a.appendChild(f);setTimeout(()=>f.remove(),900);}
 function tapRainPacket(e,b,score){
   e.preventDefault();if(!rainState.playing||rainState.requesting||b.classList.contains('tapped'))return;b.classList.add('tapped');
   if(navigator.vibrate)navigator.vibrate(12);if(rainCfg().sound!==false)popSound();
@@ -327,10 +364,19 @@ function tapRainPacket(e,b,score){
     rainState.hits++;showFloat(e.clientX,e.clientY,`已搶 ${rainState.hits}/${rainModeCfg().targetPackets} 包`);updateRainHud();setTimeout(()=>b.remove(),110);
     if(rainState.hits>=rainModeCfg().targetPackets)qualifyRain();
   }else if(sub==='C'){
-    rainState.score=Math.max(0,rainState.score+score);showFloat(e.clientX,e.clientY,`目前 ${rainState.score}/${rainModeCfg().targetScore} 分`,score<0);updateRainHud();setTimeout(()=>b.remove(),110);
+    if(b.dataset.effect==='reset'){
+      rainState.score=0;
+      if(navigator.vibrate)navigator.vibrate([25,35,25]);
+      showFloat(e.clientX,e.clientY,'💥 分數歸零！',true);
+    }else{
+      rainState.score=Math.max(0,rainState.score+score);
+      showFloat(e.clientX,e.clientY,`目前 ${rainState.score}/${rainModeCfg().targetScore} 分`,score<0);
+    }
+    updateRainHud();setTimeout(()=>b.remove(),110);
     if(rainState.score>=rainModeCfg().targetScore)qualifyRain();
   }else{
-    rainState.hits++;showFloat(e.clientX,e.clientY,`已開 ${rainState.hits}/${rainState.packetLimit} 包`);updateRainHud();drawRainB(b);
+    rainState.hits++;showFloat(e.clientX,e.clientY,`已點 ${rainState.hits}/${rainState.packetLimit} 包`);updateRainHud();
+    if((rainPlayer?.wins||0)>=rainCfg().maxWins)finishRainNoDraw('已完成本局挑戰');else drawRainB(b);
   }
 }
 function beginRain(){
@@ -340,10 +386,25 @@ function beginRain(){
 }
 function stopRainPacketsOnly(){clearInterval(rainState.spawnTimer);rainState.spawnTimer=null;document.querySelectorAll('.falling-redpacket').forEach(x=>x.remove());}
 function stopRainAll(markPlaying=false){clearInterval(rainState.spawnTimer);clearInterval(rainState.clockTimer);rainState.spawnTimer=rainState.clockTimer=null;rainState.playing=markPlaying;document.querySelectorAll('.falling-redpacket').forEach(x=>x.remove());}
+async function finishRainNoDraw(message='挑戰完成'){
+  removeRainQualifiedOverlay();stopRainAll(false);rainState.qualified=false;rainState.requesting=false;
+  try{
+    const j=await fetch('/api/rooms/'+roomId+'/rain/finish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player,deviceId,playId:rainState.playId})}).then(r=>r.json());
+    if(j.ok){room=j.room;rainPlayer=j.player;}
+  }catch(e){}
+  const r=rainCfg(),mc=rainModeCfg(),plays=rainPlayer?.plays||0,remaining=Math.max(0,mc.maxPlays-plays);
+  const action=remaining>0?`<button class="btn primary rain-again-btn" onclick="renderRainHome()">▶ 再挑戰一次（剩 ${remaining} 次）</button>`:`<div class="rain-done-note">本次活動可玩次數已用完（共 ${mc.maxPlays} 次）。</div>`;
+  $('area').innerHTML=`<div class="rain-end-card complete"><div class="rain-end-icon">✅</div><h2>${escapeHtml(message)}</h2><p>本場最多開獎 ${r.maxWins} 次已使用完；「再接再厲」也算一次正式抽獎結果。</p>${action}</div>`;
+}
+function removeRainQualifiedOverlay(){
+  const x=document.getElementById('rainQualifiedOverlay');
+  if(x)x.remove();
+}
 function qualifyRain(){
   if(rainState.qualified)return;rainState.qualified=true;stopRainAll(false);
-  const arena=$('rainArena');if(!arena)return;
-  arena.insertAdjacentHTML('beforeend',`<div class="rain-qualified"><div class="rq-icon">🎉</div><h2>已達標！</h2><p>${rainCfg().subMode==='A'?`已搶滿 ${rainState.hits} 包`:`目前 ${rainState.score} 分`}</p><div id="rainReel" class="rain-reel">準備開獎</div><button id="rainDrawBtn" class="btn rain-draw-btn" onclick="drawQualifiedRain()">🎁 立即抽獎</button></div>`);
+  if((rainPlayer?.wins||0)>=rainCfg().maxWins)return finishRainNoDraw('已達標！');
+  removeRainQualifiedOverlay();
+  document.body.insertAdjacentHTML('beforeend',`<div id="rainQualifiedOverlay" class="rain-qualified-overlay"><div class="rain-qualified"><div class="rq-icon">🎉</div><h2>已達標！</h2><p>${rainCfg().subMode==='A'?`已搶滿 ${rainState.hits} 包`:`目前 ${rainState.score} 分`}</p><div id="rainReel" class="rain-reel">準備開獎</div><button id="rainDrawBtn" class="btn rain-draw-btn" onclick="drawQualifiedRain()">🎁 立即抽獎</button></div></div>`);
 }
 async function rainDrawRequest(drawKey){
   return fetch('/api/rooms/'+roomId+'/rain/draw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player,deviceId,playId:rainState.playId,drawKey,hits:rainState.hits,score:rainState.score})}).then(r=>r.json());
@@ -353,36 +414,39 @@ async function drawQualifiedRain(){
   let j;
   try{j=await rainDrawRequest('qualified-main');}catch(e){rainState.drawing=false;if(btn){btn.disabled=false;btn.textContent='🎁 立即抽獎';}return alert('開獎連線失敗，請再試一次');}
   if(!j.ok){rainState.drawing=false;if(btn){btn.disabled=false;btn.textContent='🎁 立即抽獎';}return alert(j.message||'開獎失敗');}
-  room=j.room;rainPlayer=j.player;lastResult=j.result;
+  room=j.room;rainPlayer=j.player;
+  if(j.noDraw||!j.result){rainState.drawing=false;return finishRainNoDraw('已達標！');}
+  lastResult=j.result;
   const reel=$('rainReel'),names=[...new Set([...(room.prizes||[]).map(p=>p.name),j.result.prize])];let delay=45;
   for(let i=0;i<29;i++){if(reel)reel.textContent=names[Math.floor(Math.random()*names.length)]||'再接再厲';await new Promise(r=>setTimeout(r,delay));if(i>16)delay+=9;if(i>23)delay+=18;}
   if(reel)reel.textContent=j.result.prize;
   if(isLoseResult(j.result))loseSound();else{winSound();sparkRain();}
-  setTimeout(()=>{showResultModal(j.result);renderRainComplete(j.result);rainState.drawing=false;},550);
+  setTimeout(()=>{removeRainQualifiedOverlay();showResultModal(j.result);renderRainComplete(j.result);rainState.drawing=false;},550);
 }
 function sparkRain(){const arena=$('rainArena');if(!arena)return;for(let i=0;i<24;i++){const s=document.createElement('span');s.className='rain-spark';s.textContent=i%3?'✦':'★';s.style.left=(45+Math.random()*10)+'%';s.style.top=(40+Math.random()*15)+'%';s.style.setProperty('--sx',(Math.random()*260-130)+'px');s.style.setProperty('--sy',(Math.random()*220-110)+'px');arena.appendChild(s);setTimeout(()=>s.remove(),950);}}
 async function drawRainB(){
   if(rainState.requesting)return;rainState.requesting=true;stopRainPacketsOnly();
   let j;try{j=await rainDrawRequest('packet-'+rainState.hits);}catch(e){rainState.requesting=false;return rainTimeout('開獎連線失敗');}
   if(!j.ok){rainState.requesting=false;return rainTimeout(j.message||'開獎失敗');}
-  room=j.room;rainPlayer=j.player;lastResult=j.result;if(isLoseResult(j.result))loseSound();else winSound();
+  room=j.room;rainPlayer=j.player;
+  if(j.noDraw||!j.result){rainState.requesting=false;return finishRainNoDraw('已完成本局挑戰');}
+  lastResult=j.result;if(isLoseResult(j.result))loseSound();else winSound();
   if(j.finished){stopRainAll(false);showResultModal(j.result);renderRainComplete(j.result);rainState.requesting=false;return;}
   const arena=$('rainArena');if(arena){const t=document.createElement('div');t.className='rain-mini-result '+(isLoseResult(j.result)?'lose':'win');t.textContent=(isLoseResult(j.result)?'🧧 ':'🎉 ')+j.result.prize+`（${rainState.hits}/${rainState.packetLimit}）`;arena.appendChild(t);setTimeout(()=>t.remove(),950);}
   rainState.requesting=false;if(rainState.timeLeft>0&&rainState.hits<rainState.packetLimit){rainState.playing=true;rainState.spawnTimer=setInterval(spawnRainPacket,rainSpawnRate());for(let i=0;i<4;i++)setTimeout(spawnRainPacket,i*80);}
 }
 async function rainTimeout(custom=''){
-  if(!rainState.playId)return;stopRainAll(false);rainState.requesting=false;
+  removeRainQualifiedOverlay();if(!rainState.playId)return;stopRainAll(false);rainState.requesting=false;
   try{const j=await fetch('/api/rooms/'+roomId+'/rain/finish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player,deviceId,playId:rainState.playId})}).then(r=>r.json());if(j.ok){room=j.room;rainPlayer=j.player;}}catch(e){}
   $('area').innerHTML=`<div class="rain-end-card"><div class="rain-end-icon">⏰</div><h2>${custom?'本局結束':'時間到！'}</h2><p>${escapeHtml(custom||(rainCfg().subMode==='C'?`最後分數 ${rainState.score}`:`這次搶到 ${rainState.hits} 包`))}</p><button class="btn primary" onclick="renderRainHome()">再挑戰一次</button></div>`;
 }
 function renderRainComplete(result){
-  stopRainAll(false);rainState.qualified=false;
+  removeRainQualifiedOverlay();stopRainAll(false);rainState.qualified=false;
   const lose=isLoseResult(result),r=rainCfg(),mc=rainModeCfg(),plays=rainPlayer?.plays||0,remaining=Math.max(0,mc.maxPlays-plays);
-  const capped=String(result?.prize||'')==='已達獲獎上限';
-  const title=capped?'本次挑戰完成':lose?'本次結果：再接再厲':'恭喜完成開獎！';
-  const msg=capped?`你已達本場最多獲獎 ${r.maxWins} 個，本次不再發放獎品。`:lose?'這次沒有中獎':`抽中：${escapeHtml(result.prize)}`;
+  const title=lose?'本次結果：再接再厲':'恭喜完成開獎！';
+  const msg=lose?'本次抽獎結果為「再接再厲」，已使用 1 次開獎名額。':`抽中：${escapeHtml(result.prize)}（已使用 1 次開獎名額）`;
   const action=remaining>0?`<button class="btn primary rain-again-btn" onclick="renderRainHome()">▶ 再挑戰一次（剩 ${remaining} 次）</button>`:`<div class="rain-done-note">本次活動可玩次數已用完（共 ${mc.maxPlays} 次）。</div>`;
-  $('area').innerHTML=`<div class="rain-end-card complete"><div class="rain-end-icon">${capped?'✅':lose?'🧧':'🎉'}</div><h2>${title}</h2><p>${msg}</p>${action}</div>`;
+  $('area').innerHTML=`<div class="rain-end-card complete"><div class="rain-end-icon">${lose?'🧧':'🎉'}</div><h2>${title}</h2><p>${msg}</p>${action}</div>`;
 }
 </script>
 </body>

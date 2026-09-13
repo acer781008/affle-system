@@ -312,7 +312,7 @@ function ensureRainPlayer(r,name,deviceId){
   return {ok:true,player:r.rainPlayers[key]};
 }
 function rainPlayerPub(p){
-  return {name:p.name,plays:p.plays||0,wins:p.wins||0,active:p.active?{playId:p.active.playId,subMode:p.active.subMode,startedAt:p.active.startedAt,finished:!!p.active.finished,drawCount:p.active.drawCount||0}:null};
+  return {name:p.name,plays:p.plays||0,wins:p.wins||0,active:p.active?{playId:p.active.playId,subMode:p.active.subMode,startedAt:p.active.startedAt||null,finished:!!p.active.finished,drawCount:p.active.drawCount||0,counted:!!p.active.counted}:null};
 }
 function effectiveRainPacketLimit(r){
   return normalizeRain(r.rain).B.packetLimit;
@@ -322,13 +322,45 @@ function rainStart(r,name,deviceId){
   if(isBeforeScheduledStart(r))return {ok:false,message:'尚未開放抽獎，請等倒數結束'};
   const got=ensureRainPlayer(r,name,deviceId);if(!got.ok)return got;
   const p=got.player,cfg=normalizeRain(r.rain),mc=rainModeCfg(cfg,cfg.subMode);
+
+  // 若同一局還沒真正結束，重複按「開始」只回傳同一個 playId，
+  // 不建立新局，也不重複扣可玩次數。
+  if(p.active&&!p.active.finished&&p.active.subMode===cfg.subMode){
+    const a=p.active;
+    if(a.counted&&a.startedAt){
+      const expired=Date.now()>a.startedAt+(mc.duration+15)*1000;
+      if(expired)a.finished=true;
+      else return {ok:true,playId:a.playId,subMode:a.subMode,player:rainPlayerPub(p),room:pub(r),packetLimit:effectiveRainPacketLimit(r),resumed:true};
+    }else{
+      return {ok:true,playId:a.playId,subMode:a.subMode,player:rainPlayerPub(p),room:pub(r),packetLimit:effectiveRainPacketLimit(r),resumed:true};
+    }
+  }
+
   if((p.plays||0)>=mc.maxPlays)return {ok:false,message:`你已達此玩法可玩上限 ${mc.maxPlays} 次`};
-  const maxWins=cfg.maxWins;
-  if(p.active&&!p.active.finished)p.active.finished=true;
-  p.plays=(p.plays||0)+1;
-  p.active={playId:token(),subMode:cfg.subMode,startedAt:Date.now(),finished:false,drawCount:0};
+
+  // 先建立「待開始」局，不在這裡扣次數。
+  p.active={playId:token(),subMode:cfg.subMode,requestedAt:Date.now(),startedAt:null,finished:false,drawCount:0,counted:false};
   persistRoom(r);
   return {ok:true,playId:p.active.playId,subMode:cfg.subMode,player:rainPlayerPub(p),room:pub(r),packetLimit:effectiveRainPacketLimit(r)};
+}
+function rainConfirmStart(r,name,deviceId,playId){
+  if(r.status!=='open')return {ok:false,message:'抽獎已結束'};
+  if(isBeforeScheduledStart(r))return {ok:false,message:'尚未開放抽獎，請等倒數結束'};
+  const got=ensureRainPlayer(r,name,deviceId);if(!got.ok)return got;
+  const p=got.player,cfg=normalizeRain(r.rain),a=p.active;
+  if(!a||a.playId!==String(playId||''))return {ok:false,message:'找不到這一局，請重新開始'};
+  if(a.finished)return {ok:false,message:'這一局已結束，請重新開始'};
+  if(a.counted)return {ok:true,player:rainPlayerPub(p),room:pub(r),playId:a.playId};
+
+  const mc=rainModeCfg(cfg,a.subMode);
+  if((p.plays||0)>=mc.maxPlays){a.finished=true;return {ok:false,message:`你已達此玩法可玩上限 ${mc.maxPlays} 次`};}
+
+  // 只有玩家端真的進入遊戲、倒數完成後才計入一次。
+  p.plays=(p.plays||0)+1;
+  a.counted=true;
+  a.startedAt=Date.now();
+  emit(r);
+  return {ok:true,player:rainPlayerPub(p),room:pub(r),playId:a.playId};
 }
 function rainFinish(r,name,deviceId,playId){
   const got=ensureRainPlayer(r,name,deviceId);if(!got.ok)return got;
@@ -343,6 +375,7 @@ function rainDraw(r,body){
   const got=ensureRainPlayer(r,name,deviceId);if(!got.ok)return got;
   const p=got.player,cfg=normalizeRain(r.rain),a=p.active;
   if(!a||a.playId!==playId)return {ok:false,message:'找不到這一局，請重新開始'};
+  if(!a.counted||!a.startedAt)return {ok:false,message:'這一局尚未正式開始，請重新開始'};
   const cacheKey=`${rainKey(name)}:${playId}:${drawKey}`;
   r.rainDrawCache=r.rainDrawCache||new Map();
   if(r.rainDrawCache.has(cacheKey)){
@@ -367,22 +400,30 @@ function rainDraw(r,body){
     if(a.drawCount>=limit)return {ok:false,message:'本局可搶紅包數已用完'};
   }
 
-  const picked=pickPrizeForRain(r,(p.wins||0)<maxWins);if(!picked)return {ok:false,message:'抽獎份數已全部抽完'};
+  if((p.wins||0)>=maxWins){
+    a.finished=true;
+    const cached={result:null,finished:true,noDraw:true};
+    r.rainDrawCache.set(cacheKey,cached);
+    return {ok:true,result:null,finished:true,noDraw:true,message:'本場開獎次數已用完',player:rainPlayerPub(p),room:pub(r)};
+  }
+
+  const picked=pickPrizeForRain(r);if(!picked)return {ok:false,message:'抽獎份數已全部抽完'};
   a.drawCount=(a.drawCount||0)+1;
-  if(!picked.isLose)p.wins=(p.wins||0)+1;
-  const finished=a.subMode!=='B'||a.drawCount>=effectiveRainPacketLimit(r);
+  // 「再接再厲」也是正式抽獎結果，因此不論結果內容都要計入一次開獎名額。
+  p.wins=(p.wins||0)+1;
+  const finished=a.subMode!=='B'||a.drawCount>=effectiveRainPacketLimit(r)||(p.wins||0)>=maxWins;
   a.finished=finished;
   const result={
     slot:nextResultSlot(r),prize:picked.name,isLose:picked.isLose,
     player:p.name,deviceId:p.deviceId||deviceId,source:`rain-${a.subMode}`,time:new Date().toISOString()
   };
   r.results.push(result);
-  r.rainDrawCache.set(cacheKey,{result,finished});
+  r.rainDrawCache.set(cacheKey,{result,finished,noDraw:false});
   emit(r);
-  return {ok:true,result,finished,player:rainPlayerPub(p),room:pub(r)};
+  return {ok:true,result,finished,noDraw:false,player:rainPlayerPub(p),room:pub(r)};
 }
 
-app.get('/api/version',(req,res)=>res.json({ok:true,version:'1.3.1'}));
+app.get('/api/version',(req,res)=>res.json({ok:true,version:'1.3.2'}));
 
 app.get('/api/time',(req,res)=>res.json({ok:true,serverNow:new Date().toISOString()}));
 
@@ -496,6 +537,11 @@ app.post('/api/rooms/:id/rain/start',async(req,res)=>{
   if(!r||r.mode!=='rain')return res.status(404).json({ok:false,message:'找不到紅包雨活動'});
   const out=rainStart(r,req.body.player,req.body.deviceId);await flushState();res.json(out);
 });
+app.post('/api/rooms/:id/rain/confirm-start',async(req,res)=>{
+  const r=rooms.get(req.params.id.toUpperCase());
+  if(!r||r.mode!=='rain')return res.status(404).json({ok:false,message:'找不到紅包雨活動'});
+  const out=rainConfirmStart(r,req.body.player,req.body.deviceId,req.body.playId);await flushState();res.json(out);
+});
 app.post('/api/rooms/:id/rain/draw',async(req,res)=>{
   const r=rooms.get(req.params.id.toUpperCase());
   if(!r||r.mode!=='rain')return res.status(404).json({ok:false,message:'找不到紅包雨活動'});
@@ -575,6 +621,6 @@ async function main(){
   },10*60*1000);
   retentionTimer.unref?.();
   const port=process.env.PORT||3000;
-  server.listen(port,()=>console.log(`Raffle system V1.3.1 running on port ${port}｜storage=${storageAdapter.mode}`));
+  server.listen(port,()=>console.log(`Raffle system V1.3.2 running on port ${port}｜storage=${storageAdapter.mode}`));
 }
 main().catch(e=>{console.error('啟動失敗：',e);process.exit(1);});

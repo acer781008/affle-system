@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="stylesheet" href="style.css">
-<title>歡樂抽獎主控 V1.3.1</title>
+<title>歡樂抽獎主控 V1.3.2</title>
 </head>
 <body class="admin-body">
-<div class="top"><div class="brand">🎪 歡樂抽獎系統｜主控 <small>V1.3.1</small></div><div class="top-right-status"><div id="serverClock" class="server-clock">伺服器時間 --/-- --:--:--</div><div id="controlState">尚未產生抽獎</div></div></div>
+<div class="top"><div class="brand">🎪 歡樂抽獎系統｜主控 <small>V1.3.2</small></div><div class="top-right-status"><div id="serverClock" class="server-clock">伺服器時間 --/-- --:--:--</div><div id="controlState">尚未產生抽獎</div></div></div>
 <div class="wrap">
   <div class="grid2">
     <section class="card">
@@ -56,7 +56,7 @@
             <label><span>紅包速度</span><select id="rainSpeed" class="input"><option value="normal">普通</option><option value="fast" selected>快</option><option value="turbo">超快</option><option value="ultra">極快</option></select></label>
             <label><span>紅包密度</span><select id="rainDensity" class="input"><option value="normal">普通</option><option value="high" selected>多</option><option value="max">超多</option></select></label>
             <label><span>音效</span><select id="rainSound" class="input"><option value="true" selected>開</option><option value="false">關</option></select></label>
-            <label><span>每人最多獲獎</span><select id="rainMaxWins" class="input"><option>1</option><option>2</option><option>3</option><option>5</option></select></label>
+            <label><span>每人最多開獎次數（含再接再厲）</span><select id="rainMaxWins" class="input"><option>1</option><option>2</option><option>3</option><option>5</option></select></label>
           </div>
 
           <div id="rainPaneA" class="rain-pane">
@@ -254,7 +254,7 @@ function syncOptionPanels(){
   const rain=mode==='rain',random=mode==='random';
   const oneDraw=document.querySelector('.one-draw-toggle');if(oneDraw)oneDraw.style.display=(rain||random)?'none':'flex';
   let rn=document.getElementById('rainLimitNote');
-  if(rain&&!rn){rn=document.createElement('div');rn.id='rainLimitNote';rn.className='rain-tip';rn.textContent='🧧 紅包雨依「每人可玩次數」與「每人最多獲獎數」控制，不套用上方每人限抽一次。';document.querySelector('.admin-extra-inner')?.prepend(rn);}
+  if(rain&&!rn){rn=document.createElement('div');rn.id='rainLimitNote';rn.className='rain-tip';rn.textContent='🧧 紅包雨：「每人可玩次數」控制能挑戰幾局；「每人最多開獎次數」控制能拿幾次抽獎結果，包含「再接再厲」。';document.querySelector('.admin-extra-inner')?.prepend(rn);}
   if(rn)rn.style.display=rain?'block':'none';
   $('countLabel').textContent=random?'獎品總名額（由獎品數量自動計算）':rain?'抽獎池總份數（用來計算「再接再厲」數量）':'物件數量（主控自己填）';
   $('count').closest('.admin-extra-inner')&&($('count').style.display=random?'none':'block');
